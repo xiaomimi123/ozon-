@@ -7,6 +7,7 @@ from app.api.settings import router as settings_router
 from app.api.tasks import router as tasks_router
 from app.api.collect import router as collect_router
 from app.api.ws import router as ws_router
+from app.api.products import router as products_router
 
 setup_logging()
 
@@ -19,6 +20,7 @@ app.include_router(settings_router)
 app.include_router(tasks_router)
 app.include_router(collect_router)
 app.include_router(ws_router)
+app.include_router(products_router)
 
 @app.get("/health")
 async def health():
