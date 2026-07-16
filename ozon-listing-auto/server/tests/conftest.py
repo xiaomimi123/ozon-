@@ -4,6 +4,7 @@ from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from app.core.db import Base, get_session
 from app.main import app
+import app.models  # noqa: F401  # 注册所有 ORM 模型到 Base.metadata，确保 create_all 建出真实业务表
 
 @pytest_asyncio.fixture
 async def engine():
@@ -29,4 +30,4 @@ async def client(engine):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
-    app.dependency_overrides.clear()
+    app.dependency_overrides.pop(get_session, None)
