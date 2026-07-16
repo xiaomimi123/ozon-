@@ -22,6 +22,7 @@ class OzonProductDTO:
     attributes: dict = field(default_factory=dict)
     parent_sku: str | None = None
     product_url: str | None = None
+    phash: str | None = None
     raw: dict = field(default_factory=dict)
 
 class OzonMarketProvider(Protocol):

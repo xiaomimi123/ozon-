@@ -1,0 +1,14 @@
+[
+  {"sku":"OZ-1001","parent_sku":"OZ-1000","title":"无线蓝牙耳机 黑","price":1290,"currency":"RUB","sales_monthly":320,"rating":4.7,"reviews_count":210,"weight":0.15,"follow_count":3,"return_rate":0.04,"main_image_url":"https://img/1.jpg","phash":"aaaa1111"},
+  {"sku":"OZ-1002","parent_sku":"OZ-1000","title":"无线蓝牙耳机 白","price":1290,"currency":"RUB","sales_monthly":180,"rating":4.6,"reviews_count":95,"weight":0.15,"follow_count":3,"return_rate":0.05,"main_image_url":"https://img/2.jpg","phash":"aaaa1112"},
+  {"sku":"OZ-1003","title":"机械键盘 87键","price":3500,"currency":"RUB","sales_monthly":90,"rating":4.8,"reviews_count":60,"weight":0.9,"follow_count":1,"return_rate":0.02,"main_image_url":"https://img/3.jpg","phash":"bbbb2222"},
+  {"sku":"OZ-1003","title":"机械键盘 87键(重复SKU)","price":3499,"currency":"RUB","sales_monthly":90,"rating":4.8,"reviews_count":60,"weight":0.9,"main_image_url":"https://img/3.jpg","phash":"bbbb2222"},
+  {"sku":"OZ-1004","title":"USB-C 数据线 1m","price":390,"currency":"RUB","sales_monthly":1500,"rating":4.5,"reviews_count":800,"weight":0.05,"follow_count":8,"return_rate":0.06,"phash":"cccc3333"},
+  {"sku":"OZ-1005","title":"USB-C 数据线 1m 同图","price":420,"currency":"RUB","sales_monthly":1200,"rating":4.4,"reviews_count":300,"weight":0.05,"phash":"cccc3333"},
+  {"sku":"OZ-1006","title":"手机支架","price":650,"currency":"RUB","sales_monthly":45,"rating":4.2,"reviews_count":30,"weight":0.2,"follow_count":0,"return_rate":0.09},
+  {"sku":"OZ-1007","title":"充电宝 10000mAh","price":1890,"currency":"RUB","sales_monthly":600,"rating":4.6,"reviews_count":450,"weight":0.3,"follow_count":5,"return_rate":0.03},
+  {"sku":"OZ-1008","title":"保护壳 iPhone","price":290,"currency":"RUB","sales_monthly":2200,"rating":4.3,"reviews_count":1100,"weight":0.04,"follow_count":12,"return_rate":0.07},
+  {"sku":"OZ-1009","title":"钢化膜","price":150,"currency":"RUB","sales_monthly":3000,"rating":4.1,"reviews_count":1500,"weight":0.02,"follow_count":20,"return_rate":0.11},
+  {"sku":"OZ-1010","title":"车载支架","price":790,"currency":"RUB","sales_monthly":80,"rating":4.5,"reviews_count":55,"weight":0.25,"follow_count":2,"return_rate":0.05},
+  {"sku":"OZ-1011","title":"蓝牙音箱","price":2490,"currency":"RUB","sales_monthly":150,"rating":4.7,"reviews_count":120,"weight":0.5,"follow_count":4,"return_rate":0.04}
+]
