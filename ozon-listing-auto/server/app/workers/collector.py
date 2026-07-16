@@ -20,6 +20,7 @@ async def run_collect_core(session_factory: async_sessionmaker, task_id: int, *,
         provider = get_provider(task.provider)
         entry_type, entry_value = task.entry_type, task.entry_value
         start_page = (task.cursor or {}).get("page", 0) + 1
+        prior_stats = task.stats or {}
         task.status = "running"; await s.commit()
 
     seen_sku: set[str] = set(); seen_phash: set[str] = set()
@@ -36,7 +37,8 @@ async def run_collect_core(session_factory: async_sessionmaker, task_id: int, *,
             if phash:
                 seen_phash.add(phash)
 
-    total_inserted = total_skipped = 0
+    total_inserted = prior_stats.get("inserted", 0)
+    total_skipped = prior_stats.get("skipped", 0)
     page = start_page
     pages_done = 0
     while True:

@@ -48,3 +48,35 @@ async def test_run_collect_resume_after_pause(engine):
     async with sm() as s:
         c2 = (await s.execute(select(func.count()).select_from(OzonProduct).where(OzonProduct.task_id == tid))).scalar_one()
     assert c2 == _expected_total()                   # 幂等: 跨页去重后总数收敛到全量去重长度
+
+
+@pytest.mark.asyncio
+async def test_run_collect_paused_stops_then_resumes(engine):
+    sm = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+    async with sm() as s:
+        t = CollectTask(name="t", entry_type="keyword", entry_value="x", provider="mock", source_platforms=[])
+        s.add(t); await s.commit(); tid = t.id
+
+    # 采集过程中，用独立 session 把任务置为 paused（模拟外部暂停）
+    async def pause_cb(msg):
+        async with sm() as s2:
+            task = (await s2.execute(select(CollectTask).where(CollectTask.id == tid))).scalar_one()
+            task.status = "paused"
+            await s2.commit()
+
+    await run_collect_core(sm, tid, progress_cb=pause_cb)
+
+    async with sm() as s:
+        task = (await s.execute(select(CollectTask).where(CollectTask.id == tid))).scalar_one()
+    # 外部暂停被检测到：状态停在 paused，未推进到 done；cursor 保留以便续跑
+    assert task.status == "paused"
+    assert task.cursor is not None and task.cursor.get("page", 0) >= 1
+
+    # 续跑到完成：幂等收敛到全量去重条数，且统计跨续跑累计
+    await run_collect_core(sm, tid)
+    async with sm() as s:
+        task = (await s.execute(select(CollectTask).where(CollectTask.id == tid))).scalar_one()
+        rows = (await s.execute(select(func.count()).select_from(OzonProduct).where(OzonProduct.task_id == tid))).scalar_one()
+    assert task.status == "done"
+    assert rows == _expected_total()
+    assert task.stats["inserted"] == _expected_total()
