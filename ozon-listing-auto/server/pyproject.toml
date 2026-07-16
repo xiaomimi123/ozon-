@@ -16,6 +16,9 @@ dependencies = [
   "pydantic-settings>=2.3",
   "python-jose[cryptography]>=3.3",
   "passlib[bcrypt]>=1.7",
+  # passlib 1.7.4（最新版）的 bcrypt 后端自检代码不兼容 bcrypt>=4.1 更严格的 72
+  # 字节报错行为，会在 CryptContext 初始化时抛 ValueError，故锁定 4.0.x。
+  "bcrypt>=4.0,<4.1",
   "cryptography>=42.0",
   "python-multipart>=0.0.9",
 ]

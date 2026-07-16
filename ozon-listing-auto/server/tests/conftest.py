@@ -4,7 +4,9 @@ from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from app.core.db import Base, get_session
 from app.main import app
-import app.models  # noqa: F401  # 注册所有 ORM 模型到 Base.metadata，确保 create_all 建出真实业务表
+from app import models  # noqa: F401  # 注册所有 ORM 模型到 Base.metadata，确保 create_all 建出真实业务表；
+# 注意：不能写成 `import app.models`，那会把本模块局部名 `app` 重新绑定为顶层包，
+# 覆盖掉上面 `from app.main import app` 拿到的 FastAPI 实例。
 
 @pytest_asyncio.fixture
 async def engine():
