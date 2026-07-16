@@ -29,6 +29,8 @@ async def client(engine):
         async with sm() as s:
             yield s
     app.dependency_overrides[get_session] = _override
+    import app.core.db as dbmod
+    dbmod.async_session = sm   # 让 sync 采集走测试库
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac

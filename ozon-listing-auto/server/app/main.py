@@ -5,6 +5,8 @@ from app.core.logging import setup_logging
 from app.api.auth import router as auth_router
 from app.api.settings import router as settings_router
 from app.api.tasks import router as tasks_router
+from app.api.collect import router as collect_router
+from app.api.ws import router as ws_router
 
 setup_logging()
 
@@ -15,6 +17,8 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(settings_router)
 app.include_router(tasks_router)
+app.include_router(collect_router)
+app.include_router(ws_router)
 
 @app.get("/health")
 async def health():
