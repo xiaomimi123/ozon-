@@ -29,7 +29,12 @@ async def start_collect(task_id: int, sync: bool = False, s: AsyncSession = Depe
     from arq.connections import RedisSettings
     from app.core.config import settings
     pool = await create_pool(RedisSettings.from_dsn(settings.redis_url))
-    await pool.enqueue_job("run_collect", task_id)
+    try:
+        await pool.enqueue_job("run_collect", task_id)
+    finally:
+        # 用完立即关闭连接池，避免每次请求都泄漏一个 Redis 连接池
+        # （arq 的 ArqRedis 继承自 redis.asyncio.Redis，redis-py 5.x 用 aclose()）
+        await pool.aclose()
     return {"status": "queued"}
 
 @router.post("/pause")

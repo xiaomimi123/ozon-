@@ -30,8 +30,10 @@ async def client(engine):
             yield s
     app.dependency_overrides[get_session] = _override
     import app.core.db as dbmod
+    _orig_async_session = dbmod.async_session
     dbmod.async_session = sm   # 让 sync 采集走测试库
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
     app.dependency_overrides.pop(get_session, None)
+    dbmod.async_session = _orig_async_session   # 恢复被 monkeypatch 的模块全局
