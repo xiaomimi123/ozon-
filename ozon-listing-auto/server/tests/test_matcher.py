@@ -66,3 +66,27 @@ async def test_run_match_resume(engine):
     assert task.match_status == "done"
     # 3 商品全处理(幂等, 不重复插入)
     assert total >= c1
+
+
+@pytest.mark.asyncio
+async def test_run_match_platform_failure_isolated(engine):
+    sm = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+    tid = await _seed(sm, n_products=2)   # 复用现有 _seed helper (seeds ali1688+pinduoduo accounts)
+
+    class BoomProvider:
+        def __init__(self, platform): self.platform = platform
+        async def image_search(self, *a, **k): raise RuntimeError("平台故障")
+        async def keyword_search(self, *a, **k): raise RuntimeError("平台故障")
+        async def fetch_detail(self, *a, **k): raise RuntimeError("平台故障")
+
+    def pf(platform):
+        return MockSourceProvider(platform="ali1688") if platform == "ali1688" else BoomProvider(platform)
+
+    result = await run_match_core(sm, tid, embedder=MockEmbedder(), now_fn=_now, provider_factory=pf)
+    async with sm() as s:
+        task = (await s.execute(select(CollectTask).where(CollectTask.id == tid))).scalar_one()
+        rows = (await s.execute(select(SupplyCandidate).where(SupplyCandidate.task_id == tid))).scalars().all()
+        pdd_acc = (await s.execute(select(SourceAccount).where(SourceAccount.platform == "pinduoduo"))).scalar_one()
+    assert task.match_status == "done"                     # 单平台故障不中断主流程(降级)
+    assert {r.platform for r in rows} == {"ali1688"}       # 仅 1688 候选
+    assert pdd_acc.status == "cooldown"                    # 风控换号: report_risk 生效
