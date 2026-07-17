@@ -31,6 +31,9 @@ services:
       redis:
         condition: service_started
     ports: ["8000:8000"]
+    # M6：改图产物落盘目录，与 worker 共享同一份宿主机目录，保证 sync=true（api 进程内跑）
+    # 与 sync=false（worker 异步跑）两条改图路径写入的产物互相可见，容器重建也不丢。
+    volumes: ["./server/static:/app/static"]
   worker:
     # INSTALL_ML 默认 false：mock demo 保持轻量、无需 torch/cn_clip 即可 docker compose up 跑通；
     # 真实 CLIP 去重需在 .env 中同时设置 INSTALL_ML=true（重装带 [ml] 的镜像）+ EMBEDDER=clip。
@@ -50,6 +53,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+    volumes: ["./server/static:/app/static"]
   web:
     build: ./web
     ports: ["8080:80"]

@@ -1,6 +1,6 @@
-# Ozon 跟卖/铺货自动化系统（M1 + M2 + M3 + M4 + M5）
+# Ozon 跟卖/铺货自动化系统（M1 + M2 + M3 + M4 + M5 + M6）
 
-面向 Ozon 平台跟卖/铺货场景的自动化辅助系统。M1 完成骨架搭建：登录鉴权、采集任务管理（跟卖/自建两种模式、mock/composer/apify 三种数据源）、商品入库去重、六维条件筛选浏览、WebSocket 采集进度推送，以及 Docker Compose 一键启动。M2 在此基础上新增货源匹配：账号池、双源（1688/拼多多）候选采集、跨平台 CLIP 去重、匹配/候选管理 API。M3 在匹配候选之上新增五维评分与审核台：图像/标题/属性/价格/供应商五维打分 + tier 分级、LLM 抽象（mock/OpenAI 兼容，用于译标题与抽属性）、人工审核（采用/拒绝）或按阈值自动采用、评分/审核 API + 审核台前端。M4 在已采用候选之上新增跟卖定价与挂靠上架：定价引擎（内置毛利率反推 / simpleeval 自定义公式 + 最低价保护）、Ozon 写入抽象（MockOzonSeller/RealOzonSeller）、草稿生成与人工确认闸门（或按阈值自动确认）、挂靠上架回写 Ozon 商品 ID、店铺凭据管理（Fernet 加密）、上架 API + 前端 ListingReview/Shops 页面。M5 在确认草稿之上新增**上架节奏调度**：节奏配置（随机间隔/每日上限/活跃时段/是否等 Ozon 审核通过再推进下一条）、`plan_schedule` 把已确认草稿排出 `scheduled_at`、`tick_publish` 按节奏逐一挂靠并支持等审核门、ARQ cron 每分钟自动 tick、跨进程实时进度广播（`Broadcaster` memory/redis 双后端可切）、节奏/排期/tick/监控 API，以及首个使用 WebSocket 的前端页面 PublishMonitor。
+面向 Ozon 平台跟卖/铺货场景的自动化辅助系统。M6 在自建（`listing_mode=create`）分支上补齐了「改图 → 类目属性映射 → 定价 → 自建草稿 → 类目/图确认闸门 → 按 M5 节奏上架 → 回写 Ozon 商品 ID」的完整闭环（详见下方 M6 小节），至此跟卖与自建两条分支均端到端可跑通（mock-first）。M1 完成骨架搭建：登录鉴权、采集任务管理（跟卖/自建两种模式、mock/composer/apify 三种数据源）、商品入库去重、六维条件筛选浏览、WebSocket 采集进度推送，以及 Docker Compose 一键启动。M2 在此基础上新增货源匹配：账号池、双源（1688/拼多多）候选采集、跨平台 CLIP 去重、匹配/候选管理 API。M3 在匹配候选之上新增五维评分与审核台：图像/标题/属性/价格/供应商五维打分 + tier 分级、LLM 抽象（mock/OpenAI 兼容，用于译标题与抽属性）、人工审核（采用/拒绝）或按阈值自动采用、评分/审核 API + 审核台前端。M4 在已采用候选之上新增跟卖定价与挂靠上架：定价引擎（内置毛利率反推 / simpleeval 自定义公式 + 最低价保护）、Ozon 写入抽象（MockOzonSeller/RealOzonSeller）、草稿生成与人工确认闸门（或按阈值自动确认）、挂靠上架回写 Ozon 商品 ID、店铺凭据管理（Fernet 加密）、上架 API + 前端 ListingReview/Shops 页面。M5 在确认草稿之上新增**上架节奏调度**：节奏配置（随机间隔/每日上限/活跃时段/是否等 Ozon 审核通过再推进下一条）、`plan_schedule` 把已确认草稿排出 `scheduled_at`、`tick_publish` 按节奏逐一挂靠并支持等审核门、ARQ cron 每分钟自动 tick、跨进程实时进度广播（`Broadcaster` memory/redis 双后端可切）、节奏/排期/tick/监控 API，以及首个使用 WebSocket 的前端页面 PublishMonitor。
 
 ## 技术栈
 
@@ -74,6 +74,7 @@ npm run build    # 生产构建
 | `LLM_MODEL` | `LLM_PROVIDER=openai` 时使用的模型名 | `qwen-plus` |
 | `OZON_SELLER_PROVIDER` | Ozon 跟卖挂靠：`mock`（默认，无需真实凭据）或 `real`（真实调用 Ozon Seller API，需店铺真实凭据）。仅影响**异步/worker 路径**（`run_publish`、`run_publish_tick` 及其 cron），`sync=true` 的同步路径当前仍固定用 `mock`，见 M4/M5 章节说明 | `mock` |
 | `PROGRESS_BACKEND` | WS 进度广播后端：`memory`（默认，单进程本地 fan-out）或 `redis`（Redis pub/sub 跨进程广播，`worker`/`api` 分属不同进程时需要，例如生产环境 cron tick 的进度要推给 API 进程持有的 WS 连接） | `memory` |
+| `IMAGE_PROVIDER` | 自建改图（M6）的 `gen`（AI 生图）op 用哪个 provider：`mock`（占位，返回确定性假 URL）/`local`（Pillow 本地处理，当前未接 AI 生图，选中等价于占位）/`openai_compat`/`http`（外部 AI 生图适配器，均为 `NotImplementedError` 占位，live 后置）。**`rmbg`/`whitebg`/`watermark`/`crop_norm` 四个本地类 op 恒走 Pillow `LocalProvider`，不受此变量影响**；改图默认流水线（`POST /images/process`）只跑 `whitebg`+`crop_norm`，不含 `rmbg`/`gen`。`rmbg` 去背景需 `rembg`（属 `[ml]` 组，随 `INSTALL_ML=true` 一起装），未安装时自动降级为白底（`meta.degraded=true`），不会报错中断 | `mock` |
 
 生成生产用 `FERNET_KEY`：
 
@@ -90,30 +91,35 @@ ozon-listing-auto/
 ├── server/               # FastAPI 后端
 │   ├── app/
 │   │   ├── api/          # 路由（auth/tasks/collect/products/settings/ws/accounts/match/candidates/
-│   │   │                 #   score/review/shops/listing/pace/publish）
+│   │   │                 #   score/review/shops/listing/pace/publish/images/category/imagegen）
 │   │   ├── core/         # 配置、数据库、鉴权、加密、progress.py（Broadcaster 进度广播 memory/redis）等基础设施
 │   │   ├── models/       # SQLAlchemy ORM 模型（含 source_account/supply_candidate/review_decision/
-│   │   │                 #   shop/listing_draft/publish_pace）
+│   │   │                 #   shop/listing_draft/publish_pace/product_image/category_map）
 │   │   ├── services/     # 业务逻辑：六维筛选、入库去重、ozon_market 采集 provider、
 │   │   │                 #   sources/（1688/拼多多货源 provider）、embedding/（mock/CLIP）、账号池、候选去重入库、
 │   │   │                 #   scoring.py（五维评分引擎+tier）、review.py（审核队列/采用拒绝/自动采用/并发锁）、
 │   │   │                 #   llm/（mock/OpenAI 兼容 LLM 抽象，译标题+抽属性）、
 │   │   │                 #   pricing.py（内置反推+simpleeval 自定义公式定价引擎+最低价保护）、
-│   │   │                 #   ozon_seller/（Ozon 写入抽象 mock/real, get_product_status 查审核状态）、
-│   │   │                 #   listing_builder.py（候选+定价→跟卖草稿）、publish_scheduler.py（节奏调度 plan_schedule）
-│   │   ├── workers/      # ARQ 后台任务（采集 collector、货源匹配 matcher、评分 scorer、上架 publisher，
-│   │   │                 #   均支持断点续传/暂停；publisher.py 含 run_publish 直发 + tick_publish/run_publish_tick
-│   │   │                 #   节奏 tick，后者按分钟 cron 调度）
+│   │   │                 #   ozon_seller/（Ozon 写入抽象 mock/real，create_follow_offer/create_product/get_product_status）、
+│   │   │                 #   listing_builder.py（候选+定价→跟卖/自建草稿）、publish_scheduler.py（节奏调度 plan_schedule）、
+│   │   │                 #   imagegen/（改图 provider 抽象 mock/local/openai_compat/http）、
+│   │   │                 #   category_map.py + category_tree.py（类目属性映射：记忆表→LLM 建议→兜底）
+│   │   ├── workers/      # ARQ 后台任务（采集 collector、货源匹配 matcher、评分 scorer、上架 publisher、
+│   │   │                 #   改图 imager，均支持断点续传/暂停；publisher.py 含 run_publish 直发 + tick_publish/
+│   │   │                 #   run_publish_tick 节奏 tick，后者按分钟 cron 调度，按 draft.mode 分派 follow/create）
 │   │   └── seed.py       # 启动种子：幂等创建首个管理员
 │   ├── alembic/          # 数据库迁移
+│   ├── static/images/    # 改图产物落盘目录（运行时生成，已 .gitignore，经 /static 对外暴露）
 │   └── tests/
 ├── docs/                 # 里程碑设计文档（如 M2-货源匹配说明.md、M3-评分审核说明.md、M4-定价上架说明.md、
-│                         #   M5-节奏调度说明.md）
+│                         #   M5-节奏调度说明.md、M6-自建分支说明.md）
 └── web/                  # React + Vite 前端
     ├── src/
     │   ├── api/
-    │   ├── pages/         # 登录、任务中心、商品列表、审核台（ReviewBoard）、上架审核（ListingReview）、
-    │   │                  #   店铺管理（Shops）、上架监控（PublishMonitor，节奏配置+队列监控+实时 WS）等页面
+    │   ├── pages/         # 登录、任务中心、商品列表、审核台（ReviewBoard）、上架审核（ListingReview，含自建
+    │   │                  #   类目/属性/图确认）、店铺管理（Shops）、上架监控（PublishMonitor，节奏配置+队列
+    │   │                  #   监控+实时 WS）、图片工作室（ImageStudio，/image-studio）、AI 生图配置
+    │   │                  #   （settings/ImagegenSettings，/settings/imagegen）等页面
     │   └── store/
     └── nginx.conf         # 生产镜像内 nginx：SPA + /api、/ws 反代
 ```
@@ -194,9 +200,32 @@ ozon-listing-auto/
 
 详细操作流程（配节奏→排期→tick→监控，生产切 `PROGRESS_BACKEND=redis` + `OZON_SELLER_PROVIDER=real`）见 [`docs/M5-节奏调度说明.md`](docs/M5-节奏调度说明.md)。
 
+## M6 已实现功能（自建分支：改图与类目映射）
+
+M6 把 `listing_mode=create`（自建）任务已采用的候选，补齐了跟卖分支没有的三步——**改图 → 类目属性映射 → 自建建品**——从而让自建分支走通「采集 → 匹配 → 评分 → 采用 → 改图 → 类目映射 → 定价 → 生成自建草稿 → 类目/图确认闸门 → 按 M5 节奏上架 → 回写 Ozon 商品 ID」的完整端到端链路（mock-first，全程本地/CI 可跑通）。
+
+- **改图流水线**（`app/services/imagegen/` + `app/workers/imager.py::run_image_process_core`，`product_images` 表）：对任务下已采用候选的源图逐张跑一组 op，每 (候选, op) 产出一行 `product_images` 记录（含 `status`：`pending`/`processing`/`done`/`failed`、`result_url`、`provider`），单图下载/处理失败仅标记该行 `failed` 并记录 `error`，不影响同批其余图片。默认流水线 `ops=["whitebg", "crop_norm"]`（白底 + 裁剪归一）。
+  - **Provider 分派**（`app/services/imagegen/factory.py::process_op`）：本地类 op（`rmbg` 去背景 / `whitebg` 白底 / `watermark` 去水印 / `crop_norm` 裁剪归一）恒走 `LocalProvider`（Pillow 真实处理，不受 `IMAGE_PROVIDER` 影响）；`gen`（AI 生图，当前默认流水线未启用）才按 `gen_provider` 参数分派到 `mock`（占位假 URL）/`local`/`openai_compat`/`http`（后两者为外部 AI 生图适配器，方法体 `NotImplementedError`，live 后置）。
+  - **rmbg 降级**：`LocalProvider._rmbg()` 惰性 `import rembg`，未安装（默认镜像）时自动捕获异常降级为白底处理并在 `meta.degraded=true` 标记，不抛错中断流水线；需要真实去背景效果须以 `INSTALL_ML=true` 构建镜像安装 `rembg`（属 `[ml]` 可选依赖组，与 torch/cn_clip 同组）。
+  - **API**（`/images`，operator/reviewer）：`POST /images/process?task_id=&sync=`（`sync=true` 请求内同步跑完；`sync=false` 经 ARQ 入队 `run_image_process` 异步执行，与 `/listing/publish?sync=` 同语义）、`GET /images?task_id=&status=`（列图）、`POST /images/{id}/approve|reject`（人工采用/弃用某张产物，只有 `approved` 的图会被自建草稿采纳）。前端 **ImageStudio**（`/image-studio`）：按任务触发改图、产物网格展示 + 逐张采用/弃用。
+- **类目属性映射三级兜底**（`app/services/category_map.py::suggest_category` + `category_maps` 表）：
+  1. **记忆表命中**：按候选标题归一化出的 `signature`（取标题前 120 字符）查 `category_maps`，命中且 `confirmed=true` 直接复用（`usage_count` 自增），跨任务同类商品无需重复问 LLM。
+  2. **LLM 建议**：未命中时把候选标题 + `CategoryTreeProvider` 枚举的叶子类目列表交给 `LLMProvider.extract_json`，要求返回 `{category_id, path, attributes}` 结构化 JSON；解析失败或未给出 `category_id` 时判定 LLM 建议无效。
+  3. **兜底默认**：LLM 也未给出有效结果时兜底为固定类目（当前写死 `category_id=15621048`「Дом」，`source="fallback"`）。
+  - **人工确认写回复用**（`confirm_category`）：审核人在 `POST /listing/{draft_id}/confirm-category` 里改定的类目/属性会写回该草稿，同时 upsert 一条 `category_maps` 记录（`confirmed=true`），供后续同类商品的记忆表命中复用——形成「越用越准」的闭环。
+  - **类目树**（`app/services/category_tree.py::CategoryTreeProvider`）：`mock`（默认，6 节点固定小树，含 3 个一级分类 + 3 个叶子类目，供 LLM 候选枚举 + 前端下拉 `GET /categories`）；`real`（走 composer-api `categoryChildV3`）**未实现，仅占位 import，live 后置**。
+- **自建草稿生成**（`app/services/listing_builder.py::build_create_drafts`，`POST /listing/build` 按任务 `listing_mode` 自动分派到此函数）：对已采用候选逐个译标题（`llm.translate`）+ 定价（复用 M4 `pricing.py`）+ 类目建议（上述三级）+ 拉取该候选 `status="approved"` 的改图产物 URL 列表，写入 `listing_drafts`（`mode="create"`）；按 `(task_id, candidate_id)` 幂等，无已采用图时 `images=[]` 待人工在确认页补齐。
+- **确认闸门**（`app/workers/publisher.py::confirm_draft`）：`mode="create"` 的草稿在 `category_id is None` 或 `images` 为空时，`POST /listing/{id}/confirm` 会直接返回错误提示「自建草稿需先确认类目与图片再确认上架」而不放行，倒逼「先在 ImageStudio 采用图 + 在 ListingReview 确认类目属性，再确认上架」的顺序；跟卖（`mode="follow"`）草稿不受此闸门影响。前端 **ListingReview**（`/listing`）新增自建分支 UI：展示已采用图、类目下拉（`GET /categories`）+ LLM 建议（`POST /category/suggest`）+ 属性 JSON 编辑，确认后调 `POST /listing/{id}/confirm-category`。
+- **自建建品（mock-first）**（`app/services/ozon_seller/`，`create_product()`，`_call_seller()` 按 `draft.mode` 分派）：`MockOzonSeller.create_product` 确定性返回成功、`ozon_product_id="OZC-{offer_id}"`，供本地/CI/演示全链路验证；`RealOzonSeller.create_product` 为占位实现（构造请求体但**不发真实网络请求**，恒返回 `ok=False` + `error="...未联调(live 校正)"`），真实 Ozon 建品端点（`/v2/product/import`）的字段与鉴权需 live 联调时校正。上架路径与跟卖分支共用 M5 节奏调度（`plan_schedule`/`tick_publish`），由 `OZON_SELLER_PROVIDER` 环境变量控制异步路径用 mock 还是 real（`sync=true` 同步路径固定 mock，语义同 M4/M5）。
+- **AI 生图配置中心**（`GET/PUT /settings/imagegen`，admin，`app/api/imagegen.py`）：`provider`（`mock`/`local`/`openai_compat`/`http`）、`img_base_url`、`img_api_key`（`FERNET_KEY` 加密存储，`GET` 脱敏返回 `"***"`，`PUT` 时留空不覆盖已存密钥）、`img_model`、`fallback`（降级顺序）。前端 **AI 生图配置页**（`/settings/imagegen`，`ImagegenSettings.tsx`）。当前该配置项尚**未接入**改图流水线的实际 provider 选择（`run_image_process_core` 的 `gen_provider` 参数与默认 `ops` 列表未读取此配置或 `IMAGE_PROVIDER` 环境变量），留作后续把「gen 类 op + 外部适配器」接入主流程时的配置面。
+- **数据模型**（迁移 `0006_m6_create_branch`）：新建 `product_images`（改图产物）、`category_maps`（类目映射记忆表，`signature` 唯一索引）；`listing_drafts` 新增 `title`/`description`/`category_id`/`attributes`/`images` 列，`ozon_product_id` 改为可空（自建草稿在建品成功前没有 Ozon 商品 ID）。
+- **改图产物存储**：落盘到 `server/static/images/`（运行时生成，已 `.gitignore`），FastAPI 用 `StaticFiles` 挂载到 `/static` 对外提供；Docker Compose 下 `api`/`worker` 两个服务共享同一个宿主机目录卷（`./server/static:/app/static`），保证同步路径（`api` 容器内跑）与异步路径（`worker` 容器内跑）写入的产物互相可见、且容器重建不丢失。**若要接 Ozon 拉图上架真实生产环境，需要这个静态目录能被公网访问**（例如反代出公网域名，或替换为对象存储 + CDN 直链），当前 mock-first 阶段尚未处理，留作 M7/live 后置项。
+
+详细设计取舍与 live 后置清单见 [`docs/M6-自建分支说明.md`](docs/M6-自建分支说明.md)。
+
 ## 测试
 
-后端（100 个用例，默认跳过标记为 `live` 的真实网络冒烟测试，覆盖 M1 采集 + M2 货源匹配 + M3 评分审核 + M4 定价上架 + M5 节奏调度全链路）：
+后端（125 个用例，默认跳过标记为 `live` 的真实网络冒烟测试，覆盖 M1 采集 + M2 货源匹配 + M3 评分审核 + M4 定价上架 + M5 节奏调度 + M6 自建改图/类目映射全链路）：
 
 ```bash
 cd server && .venv/bin/python -m pytest -q
@@ -229,5 +258,5 @@ cd web && npx vitest run
 - **M3**：五维评分与审核台（已完成）——五维评分引擎+tier、LLM 抽象（mock/OpenAI 兼容）、审核台（采用/拒绝/自动采用）、评分/审核 API
 - **M4**：跟卖定价与挂靠上架（已完成）——定价引擎（内置反推/自定义公式+最低价保护）、Ozon 写入抽象（mock/real）、草稿生成/确认闸门/自动确认、挂靠上架回写 Ozon 商品 ID、店铺凭据管理、上架 API + 前端。`POST /listing/publish` 仍保留「确认后直接挂靠全部 `confirmed` 草稿」的直发路径，不经排期
 - **M5**：上架节奏调度（已完成）——节奏配置 `/pace`、`plan_schedule` 排期（随机间隔/活跃时段/每日上限）、`tick_publish` 逐一挂靠 + 等 Ozon 审核门、ARQ cron 每分钟自动 tick、`Broadcaster` 跨进程实时进度（memory/redis 可切）、排期/tick/监控 API、首个 WS 前端页面 PublishMonitor
-- **M6**：自建改图与类目映射（待开发）
+- **M6**：自建改图与类目映射（已完成）——改图流水线（provider 抽象 mock/local(Pillow)/openai_compat/http，rmbg 降级白底）、类目属性映射三级兜底（记忆表/LLM/兜底）+ 记忆表复用、自建草稿生成、类目+图确认闸门、自建建品（mock-first，`RealOzonSeller.create_product` 占位待 live 联调）、`/images`、`/categories`、`/settings/imagegen` API + 前端 ImageStudio/ImagegenSettings
 - **M7**：公网部署（Nginx + HTTPS）（待开发）
