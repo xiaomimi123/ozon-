@@ -3,5 +3,15 @@ from app.models.user import User
 from app.models.collect_task import CollectTask
 from app.models.ozon_product import OzonProduct
 from app.models.app_setting import AppSetting
+from app.models.source_account import SourceAccount
+from app.models.supply_candidate import SupplyCandidate, EMBED_DIM
 
-__all__ = ["User", "CollectTask", "OzonProduct", "AppSetting"]
+__all__ = [
+    "User",
+    "CollectTask",
+    "OzonProduct",
+    "AppSetting",
+    "SourceAccount",
+    "SupplyCandidate",
+    "EMBED_DIM",
+]
