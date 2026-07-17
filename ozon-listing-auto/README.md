@@ -68,6 +68,10 @@ npm run build    # 生产构建
 | `ADMIN_PASSWORD` | 启动种子创建的首个管理员密码 | `admin123` |
 | `EMBEDDER` | 货源匹配用的图像 embedder：`mock`（无需 torch）或 `clip`（真实 `ChineseClipEmbedder`） | `mock` |
 | `INSTALL_ML` | worker 镜像构建参数，是否安装 `[ml]`（torch/cn_clip，体积达数 GB）；仅 `EMBEDDER=clip` 时需要设为 `true` | `false` |
+| `LLM_PROVIDER` | 五维评分用的 LLM 服务：`mock`（确定性桩，无需 key）或 `openai`（OpenAI 兼容 Chat Completions） | `mock` |
+| `LLM_BASE_URL` | `LLM_PROVIDER=openai` 时的接口地址 | `https://dashscope.aliyuncs.com/compatible-mode/v1`（通义千问 DashScope） |
+| `LLM_API_KEY` | `LLM_PROVIDER=openai` 时的 API key | 空 |
+| `LLM_MODEL` | `LLM_PROVIDER=openai` 时使用的模型名 | `qwen-plus` |
 
 生成生产用 `FERNET_KEY`：
 
