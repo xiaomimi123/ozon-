@@ -4,11 +4,15 @@ from datetime import datetime
 from sqlalchemy import JSON, String, Integer, Float, DateTime, ForeignKey, UniqueConstraint, Index, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
+from pgvector.sqlalchemy import Vector
 
 from app.core.db import Base
+from app.models.supply_candidate import EMBED_DIM
 
 # Postgres 用 JSONB，测试用的 SQLite 无 JSONB 类型，退化为通用 JSON。
 _JSONB = JSONB().with_variant(JSON(), "sqlite")
+# pgvector 在 SQLite 下不可用，退化为 JSON 存储浮点数组（供 M3 图片相似度评分使用）。
+_VECTOR = Vector(EMBED_DIM).with_variant(JSON(), "sqlite")
 
 
 class OzonProduct(Base):
@@ -37,5 +41,6 @@ class OzonProduct(Base):
     attributes: Mapped[dict | None] = mapped_column(_JSONB, nullable=True)
     parent_sku: Mapped[str | None] = mapped_column(String(64), nullable=True)
     phash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    embedding: Mapped[list | None] = mapped_column(_VECTOR, nullable=True)
     raw: Mapped[dict | None] = mapped_column(_JSONB, nullable=True)
     collected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
