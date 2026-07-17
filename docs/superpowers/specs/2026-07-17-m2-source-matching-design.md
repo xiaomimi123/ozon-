@@ -1,7 +1,13 @@
 # 设计文档：M2 — 货源匹配（1688 + 拼多多双源 + 账号池 + CLIP 跨平台去重）
 
 > Ozon 跟卖/铺货自动化系统 v3.0，第二个里程碑。建立在已合入 main 的「骨架 + M1」之上。
-> 版本：v1 ｜ 日期：2026-07-17 ｜ 依据：`开发文档v3-*.md` §5.3/§5.4、里程碑表 M2、M1 代码。
+> 版本：v2 ｜ 日期：2026-07-17 ｜ 依据：`开发文档v3-*.md` §5.3/§5.4、`货源采集技术参考-1688与拼多多.md`、里程碑表 M2、M1 代码。
+
+> **采集技术参考要点（据《货源采集技术参考》）**：
+> - **1688 采集难度低、字段现成**：图搜（拍立淘）为主，参考 Zhui-CN/1688_image_search_crawler 的返回结构，字段基本覆盖候选表与 M3 五维评分所需。**主力货源，先做。**
+> - **拼多多难度高**：anti_content 加密 + 需登录态 + 策略常变。**真实实现走 selenium/playwright + 代理截获移动端 API**（参考 SZFsir/pddSpider，"截流"而非"重放"），而非纯 JS 逆向；**一期先关键词检索、图搜后补**。**后做。**
+> - **降级**：拼多多不稳定时，任务可**仅用 1688 货源完成，不阻塞主流程**（SourceProvider 抽象按平台启停）。拼多多优质代理 IP 属运行成本（甲方承担）。
+> - **落地顺序**：先 1688 图搜跑通，再攻拼多多。
 
 ## 1. 目标与范围
 
@@ -26,9 +32,9 @@ server/app/
 ├── services/
 │   ├── sources/
 │   │   ├── base.py        # SourceProvider 接口 + SupplyCandidateDTO
-│   │   ├── mock.py        # MockSourceProvider(fixtures, 含跨平台近似重复样本)
-│   │   ├── ali1688.py     # Ali1688Provider(cookie 拍立淘图搜/关键词)
-│   │   ├── pinduoduo.py   # PinduoduoProvider(cookie, 独立参数)
+│   │   ├── mock.py        # MockSourceProvider(fixtures, 含跨平台近似重复样本+完整供应商字段)
+│   │   ├── ali1688.py     # Ali1688Provider(httpx+cookie 拍立淘图搜/关键词, 参考 Zhui-CN 字段)
+│   │   ├── pinduoduo.py   # PinduoduoProvider(selenium/playwright+代理截获, 一期先关键词; 参考 SZFsir)
 │   │   └── factory.py     # get_source_provider(platform)
 │   ├── embedding/
 │   │   ├── base.py        # Embedder 接口(dim=512)
@@ -68,9 +74,11 @@ created_at, updated_at
 id, task_id(fk collect_tasks), ozon_product_id(fk ozon_products),
 platform('ali1688'|'pinduoduo'), offer_id,
 title, price(numeric null), currency,
+quantity_begin(int null 起批量), quantity_prices(jsonb null 阶梯价),
 image_url, images(jsonb), phash(varchar null),
 embedding(vector(512) null),
-detail_url, supplier_name, supplier_info(jsonb),
+detail_url, supplier_name,
+supplier_info(jsonb  # 复购率/信用/注册资本/省市/验厂标签/分项评分/GMV, M3 五维评分用),
 dedup_group(int null), is_representative(bool 默认true),
 source_account_id(fk source_accounts null),
 status('candidate' 默认), raw(jsonb), created_at
@@ -96,20 +104,28 @@ ALTER TABLE collect_tasks ADD:
 class SupplyCandidateDTO:
     platform: str; offer_id: str
     title: str | None; price: float | None; currency: str | None
+    quantity_begin: int | None          # 起批量
+    quantity_prices: list | None         # 阶梯价 [{qty, price}, ...]
     image_url: str | None; images: list[str]
     detail_url: str | None
-    supplier_name: str | None; supplier_info: dict
+    supplier_name: str | None            # company_name
+    supplier_info: dict                  # 供应商质量指标(M3 五维评分用), 见下
     raw: dict
+```
+`supplier_info` 目标字段（对齐 Zhui-CN 1688 图搜返回，拼多多尽量映射，缺则 null）：
+`repurchase_rate`(复购率) · `credit_level`/`credit_text`(信用 AAA) · `reg_capital`(注册资本) · `province`/`city` · `position_labels`(深度验厂/7×24H响应/先采后付…) · `scores`(综合/咨询/物流/退货等分项) · `gmv_price`(GMV)。M3 五维评分（供应商质量15%/属性一致性15%/价格5%）直接消费这些字段。
 
+```python
 class SourceProvider(Protocol):
     platform: str
     async def image_search(self, image_url: str, *, session) -> list[SupplyCandidateDTO]: ...
     async def keyword_search(self, kw: str, *, session) -> list[SupplyCandidateDTO]: ...
     async def fetch_detail(self, offer_id: str, *, session) -> SupplyCandidateDTO: ...
 ```
-- `session` = 账号池取到的 cookie 会话。
-- `MockSourceProvider`：fixtures 返回候选，样本含跨平台近似重复图 + 不同款；无账号/网络。
-- `Ali1688Provider`/`PinduoduoProvider`：cookie 抓前台，请求层与解析层分离（同 M1 composer）；真实版在 M2 实现但联调用 `@pytest.mark.live` 默认跳过。
+- `session` = 账号池取到的会话句柄：1688 为 cookie 会话（httpx）；拼多多为浏览器+代理句柄（selenium/playwright，"截流"返回 JSON）。接口对上层无感，具体用法由各 provider 决定。
+- `MockSourceProvider`：fixtures 返回候选，样本含跨平台近似重复图 + 不同款，且填充完整 `supplier_info` 字段（供 M3 评分链路先跑通）；无账号/网络。
+- `Ali1688Provider`（主力，先做）：httpx + cookie 拍立淘图搜为主、关键词为辅，字段结构参考 Zhui-CN；请求层与解析层分离（同 M1 composer）。真实版 `@pytest.mark.live` 默认跳过。
+- `PinduoduoProvider`（后做）：selenium/playwright + 代理**截获移动端 API 返回 JSON**（不死磕 anti_content 逆向）；**一期先 `keyword_search`，`image_search` 后补**（可先 `NotImplementedError` 占位）；独立账号池 + 优质代理。真实版 `@pytest.mark.live` 默认跳过。
 - `factory.get_source_provider(platform)`。
 
 ### 4.2 Embedder（`services/embedding/`）
@@ -182,7 +198,9 @@ WS   /ws/progress                         # 复用 Broadcaster + match 事件
 ## 9. 风险与降级
 | 风险 | 应对 |
 |---|---|
-| 1688/拼多多 图搜反爬 | mock-first 保证链路先通；cookie 账号池 + 限速 + 冷却换号；真实版 live 默认跳过，联调再调 cookie/代理 |
+| 1688 图搜反爬 | 难度低；mock-first 先通；cookie 账号池 + 限速(≥6s+抖动) + 冷却换号；真实版 live 默认跳过 |
+| 拼多多 anti_content/策略常变 | **selenium/playwright + 代理截流**（不逆向 anti_content）；**一期先关键词、图搜后补**；真实版 live 默认跳过 |
+| 拼多多这条腿不稳 | **降级：任务仅用 1688 完成，不阻塞主流程**（SourceProvider 按平台启停）；拼多多优质代理成本甲方承担 |
 | CLIP 镜像重/下载慢 | 默认 mock embedder；ML 仅 worker 镜像装；懒加载；模型可预热 |
 | 前台结构变化 | 请求层与解析层分离，只改解析器；provider 版本化 |
 | 账号并发取同号 | Redis 分布式锁 + `last_used_at` 更新 |
