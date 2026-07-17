@@ -17,5 +17,7 @@ class Settings(BaseSettings):
     llm_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     llm_api_key: str = ""
     llm_model: str = "qwen-plus"
+    # Ozon 跟卖挂靠：mock（默认，无需真实凭据）或 real（真实调用 Ozon Seller API，需店铺真实凭据）。
+    ozon_seller_provider: str = "mock"   # mock | real; 真实挂靠需配 real + 店铺真实凭据
 
 settings = Settings()

@@ -6,6 +6,8 @@ from app.models.app_setting import AppSetting
 from app.models.source_account import SourceAccount
 from app.models.supply_candidate import SupplyCandidate, EMBED_DIM
 from app.models.review_decision import ReviewDecision
+from app.models.shop import Shop
+from app.models.listing_draft import ListingDraft
 
 __all__ = [
     "User",
@@ -16,4 +18,6 @@ __all__ = [
     "SupplyCandidate",
     "EMBED_DIM",
     "ReviewDecision",
+    "Shop",
+    "ListingDraft",
 ]

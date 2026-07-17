@@ -22,6 +22,7 @@ dependencies = [
   "cryptography>=42.0",
   "python-multipart>=0.0.9",
   "pgvector>=0.3",
+  "simpleeval>=0.9",
 ]
 
 [project.optional-dependencies]
