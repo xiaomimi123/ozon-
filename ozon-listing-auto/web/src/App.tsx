@@ -6,6 +6,7 @@ import Products from "./pages/Products";
 import ReviewBoard from "./pages/ReviewBoard";
 import ListingReview from "./pages/ListingReview";
 import Shops from "./pages/Shops";
+import PricingSettings from "./pages/PricingSettings";
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
           <Route path="/review" element={<ReviewBoard />} />
           <Route path="/listing" element={<ListingReview />} />
           <Route path="/shops" element={<Shops />} />
+          <Route path="/pricing" element={<PricingSettings />} />
         </Route>
         <Route path="*" element={<Navigate to="/tasks" replace />} />
       </Routes>
