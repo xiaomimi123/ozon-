@@ -7,6 +7,8 @@ def test_parse_json_loose():
     assert _parse_json_loose('{"color": "black"}') == {"color": "black"}
     assert _parse_json_loose('```json\n{"a": 1}\n```') == {"a": 1}   # 去代码围栏
     assert _parse_json_loose("not json") == {}                        # 容错
+    assert _parse_json_loose('```json\n{"a": {"b": 1}}\n```') == {"a": {"b": 1}}   # 围栏内嵌套对象不被截断
+    assert _parse_json_loose('前缀 {"x": {"y": 2}} 后缀') == {"x": {"y": 2}}          # 无围栏嵌套(贪婪到最后一个 })
 
 
 @pytest.mark.live

@@ -8,7 +8,7 @@ def _parse_json_loose(text: str) -> dict:
     """从模型返回文本中容错解析 JSON：去掉 ```json 代码围栏、截取 {...} 片段，解析失败返回 {}。"""
     if not text:
         return {}
-    m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+    m = re.search(r"```(?:json)?\s*(\{.*\})\s*```", text, re.DOTALL)
     raw = m.group(1) if m else text
     m2 = re.search(r"\{.*\}", raw, re.DOTALL)
     if m2:
