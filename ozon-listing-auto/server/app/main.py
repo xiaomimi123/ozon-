@@ -25,3 +25,9 @@ app.include_router(products_router)
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+@app.on_event("startup")
+async def _startup():
+    from app.core.db import async_session
+    from app.seed import ensure_admin
+    await ensure_admin(async_session)
