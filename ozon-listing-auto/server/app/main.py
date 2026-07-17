@@ -18,6 +18,7 @@ from app.api.review import router as review_router
 from app.api.shops import router as shops_router
 from app.api.listing import router as listing_router
 from app.api.pace import router as pace_router
+from app.api.publish import router as publish_router
 
 setup_logging()
 
@@ -56,6 +57,7 @@ app.include_router(review_router)
 app.include_router(shops_router)
 app.include_router(listing_router)
 app.include_router(pace_router)
+app.include_router(publish_router)
 
 @app.get("/health")
 async def health():
