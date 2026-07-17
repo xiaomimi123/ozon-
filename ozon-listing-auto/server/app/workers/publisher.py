@@ -102,9 +102,9 @@ async def tick_publish(session_factory, task_id: int, *, seller, now, max_batch:
                 except Exception as exc:  # noqa: BLE001  查询失败按"仍在审核中"处理, 不误判成功/失败
                     st = "pending"; log.error("status_poll_failed", draft_id=did, error=str(exc))
                 if st == "approved":
-                    d.status = "published"
+                    d.status = "published"; published += 1
                 elif st == "rejected":
-                    d.status = "failed"; d.error = "ozon rejected"
+                    d.status = "failed"; d.error = "ozon rejected"; failed += 1
                 else:
                     waiting = True
                 await s.commit()
@@ -137,6 +137,7 @@ async def tick_publish(session_factory, task_id: int, *, seller, now, max_batch:
                     d.status = "failed"; d.error = res.error; failed += 1
             except Exception as exc:  # noqa: BLE001  单条草稿失败不影响其他草稿(§4.2.6)
                 err = str(exc) or exc.__class__.__name__
+                log.error("publish_failed", draft_id=did, error=err)
                 d.status = "failed"; d.error = err; failed += 1
             await s.commit()
         await broadcaster.publish({"task_id": task_id, "draft_id": did, "phase": "publish",

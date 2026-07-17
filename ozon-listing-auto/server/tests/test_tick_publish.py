@@ -68,3 +68,22 @@ async def test_tick_approval_gate_blocks_next(engine):
     async with sm() as s:
         d = (await s.execute(select(ListingDraft).where(ListingDraft.task_id == tid))).scalar_one()
     assert d.status == "published"
+    assert r2["published"] == 1        # 等审核门转 approved 也计入 published 计数
+
+@pytest.mark.asyncio
+async def test_tick_gate_rejected_marks_failed(engine):
+    sm = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+    tid, now = await _seed(sm, wait_approval=True)
+    async with sm() as s:
+        d = (await s.execute(select(ListingDraft).where(ListingDraft.task_id == tid))).scalar_one()
+        d.status = "pending_review"; d.ozon_result = {"ozon_product_id": "OZ-A0", "status": "pending_review"}
+        await s.commit()
+
+    class RejectSeller(MockOzonSeller):
+        async def get_product_status(self, **kw):
+            return "rejected"
+
+    r = await tick_publish(sm, tid, seller=RejectSeller(), now=now)
+    async with sm() as s:
+        d = (await s.execute(select(ListingDraft).where(ListingDraft.task_id == tid))).scalar_one()
+    assert d.status == "failed" and r["failed"] == 1
