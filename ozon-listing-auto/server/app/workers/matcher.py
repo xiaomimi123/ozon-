@@ -135,8 +135,12 @@ async def run_match_core(session_factory: async_sessionmaker, task_id: int, *, e
 
 
 async def run_match(ctx, task_id: int) -> dict:
-    """ARQ 任务入口：包装 run_match_core，使用真实 DB session 工厂 + 生产 provider/embedder。"""
+    """ARQ 任务入口：包装 run_match_core，使用真实 DB session 工厂 + 生产 provider/embedder。
+
+    embedder 按 `settings.embedder`（环境变量 `EMBEDDER`，默认 mock）切换：mock 无需
+    torch 即可跑通，clip 需要 worker 镜像以 `INSTALL_ML=true` 构建并安装 `[ml]` 组。
+    """
     from app.core.db import async_session
+    from app.core.config import settings
     from app.services.embedding.factory import get_embedder
-    # 简化：默认 mock embedder，clip 由配置切换(Task 10 接)
-    return await run_match_core(async_session, task_id, embedder=get_embedder("mock"))
+    return await run_match_core(async_session, task_id, embedder=get_embedder(settings.embedder))
