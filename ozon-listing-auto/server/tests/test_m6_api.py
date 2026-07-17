@@ -58,3 +58,21 @@ async def test_categories_tree_endpoint(client, db_session):
     tid, cid, h = await _seed_adopted_create(client, db_session)
     r = await client.get("/categories", headers=h)
     assert r.status_code == 200 and isinstance(r.json(), list) and r.json()
+
+
+@pytest.mark.asyncio
+async def test_create_mode_drafts_listing_not_500(client, db_session):
+    """自建草稿(ozon_product_id 可空) 经 /listing/build 生成后, GET /listing/drafts 不应 500,
+    且返回体应含自建字段(mode/title/category_id)。"""
+    tid, cid, h = await _seed_adopted_create(client, db_session)
+    build = await client.post(f"/listing/build?task_id={tid}", headers=h)
+    assert build.status_code == 200
+
+    r = await client.get(f"/listing/drafts?task_id={tid}", headers=h)
+    assert r.status_code == 200
+    drafts = r.json()
+    assert len(drafts) >= 1
+    d = drafts[0]
+    assert d["mode"] == "create"
+    assert "category_id" in d
+    assert d["title"]
