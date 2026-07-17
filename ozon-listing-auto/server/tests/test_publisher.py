@@ -1,4 +1,3 @@
-import json
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
@@ -46,3 +45,18 @@ async def test_run_publish_mock(engine):
     assert result["published"] == 1
     assert d.status == "published"
     assert d.ozon_result and d.ozon_result["ozon_product_id"] == "OZ-A1"
+
+@pytest.mark.asyncio
+async def test_publish_bad_credential_isolated(engine):
+    # 一条草稿的 api_key 密文损坏 → 只该条 failed, run 不崩、返回干净结果
+    sm = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+    tid, did = await _seed(sm, {"listing_review_required": True}, draft_status="confirmed")
+    async with sm() as s:
+        shop = (await s.execute(select(Shop))).scalars().first()
+        shop.api_key_encrypted = b"not-a-valid-fernet-token"   # 损坏密文 → decrypt 抛错
+        await s.commit()
+    result = await run_publish_core(sm, tid, seller=MockOzonSeller())   # 必须不抛异常
+    async with sm() as s:
+        d = (await s.execute(select(ListingDraft).where(ListingDraft.id == did))).scalar_one()
+    assert result["failed"] == 1 and result["published"] == 0
+    assert d.status == "failed" and d.error

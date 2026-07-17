@@ -1,5 +1,4 @@
 """跟卖上架 worker(follow 分支)：自动确认 + 确认草稿挂靠→回写(§5.9)。M4 直接挂靠, 无节奏。"""
-import json
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 from app.core.logging import get_logger
@@ -44,22 +43,23 @@ async def run_publish_core(session_factory: async_sessionmaker, task_id: int, *,
             break
         async with session_factory() as s:
             d = (await s.execute(select(ListingDraft).where(ListingDraft.id == did))).scalar_one()
-            shop = (await s.execute(select(Shop).where(Shop.id == d.shop_id))).scalar_one_or_none() if d.shop_id else None
-            client_id = shop.client_id if shop else ""
-            api_key = decrypt(shop.api_key_encrypted) if shop else ""
             try:
+                shop = (await s.execute(select(Shop).where(Shop.id == d.shop_id))).scalar_one_or_none() if d.shop_id else None
+                client_id = shop.client_id if shop else ""
+                api_key = decrypt(shop.api_key_encrypted) if shop else ""
+                offer_id = str((await s.execute(select(SupplyCandidate.offer_id).where(SupplyCandidate.id == d.candidate_id))).scalar_one())
                 res = await seller.create_follow_offer(
                     client_id=client_id, api_key=api_key, target_sku=d.target_ozon_sku, barcode=d.barcode,
-                    price=float(d.price) if d.price is not None else 0.0, stock=d.stock_qty,
-                    offer_id=str((await s.execute(select(SupplyCandidate.offer_id).where(SupplyCandidate.id == d.candidate_id))).scalar_one()))
+                    price=float(d.price) if d.price is not None else 0.0, stock=d.stock_qty, offer_id=offer_id)
                 if res.ok:
                     d.status = "published"; d.ozon_result = {"ozon_product_id": res.ozon_product_id, "status": res.status}
                     published += 1
                 else:
                     d.status = "failed"; d.error = res.error; failed += 1
-            except Exception as exc:  # noqa: BLE001
-                log.error("publish_failed", draft_id=did, error=str(exc))
-                d.status = "failed"; d.error = str(exc); failed += 1
+            except Exception as exc:  # noqa: BLE001  单条草稿失败不影响其他草稿(§4.2.6)
+                err = str(exc) or exc.__class__.__name__  # 部分异常(如 InvalidToken)str() 为空, 兜底用类名
+                log.error("publish_failed", draft_id=did, error=err)
+                d.status = "failed"; d.error = err; failed += 1
             await s.commit()
         if progress_cb:
             await progress_cb({"task_id": task_id, "draft_id": did, "published": published, "failed": failed})
