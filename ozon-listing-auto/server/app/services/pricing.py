@@ -1,10 +1,10 @@
 """定价引擎：内置毛利率反推 + simpleeval 自定义公式 + 最低价保护(§5.8)。"""
+import ast
 from dataclasses import dataclass, field
 
 DEFAULT_PRICING = {"mode": "builtin", "commission_rate": 0.15, "fulfillment_rate": 0.10,
                    "fx": 13.0, "target_margin": 0.20, "logistics": 5.0, "min_price": 0.0,
                    "strike_coeff": 1.3, "formula": ""}
-_ALLOWED = ("cost", "logistics", "commission_rate", "fulfillment_rate", "fx", "weight", "target_margin", "min_price")
 
 @dataclass
 class PriceResult:
@@ -33,7 +33,8 @@ def _formula(cost_cny: float, weight, p: dict) -> tuple[float, bool]:
             "fulfillment_rate": float(p.get("fulfillment_rate", 0.10)),
             "fx": float(p.get("fx", 13.0)), "weight": float(weight) if weight else 0.0,
             "target_margin": float(p.get("target_margin", 0.2)), "min_price": float(p.get("min_price", 0.0))})
-        se.functions = {}   # 禁函数(含 __import__ 等)
+        se.functions = {}   # 禁裸函数调用 + 禁属性访问, 只允许白名单数值变量的算术运算
+        se.nodes.pop(ast.Attribute, None)   # 禁属性/方法访问(obj.method()), 定价公式只需数值运算
         val = float(se.eval(str(p.get("formula", "")) or "0"))
         return val, False
     except Exception:       # noqa: BLE001  求值失败/被禁 → 安全兜底

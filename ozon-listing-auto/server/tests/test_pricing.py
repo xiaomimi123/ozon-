@@ -30,3 +30,9 @@ def test_formula_safe_no_arbitrary_code():
     params = {**DEFAULT_PRICING, "mode": "formula", "formula": "__import__('os').system('echo x')"}
     r = price_candidate(10.0, None, params)
     assert r.blocked is True   # 求值失败/被禁 → 安全兜底(blocked)
+
+def test_formula_blocks_attribute_access():
+    params = {**DEFAULT_PRICING, "mode": "formula", "formula": "cost.__class__.__bases__"}
+    assert price_candidate(10.0, None, params).blocked is True
+    params2 = {**DEFAULT_PRICING, "mode": "formula", "formula": "cost.hex()"}
+    assert price_candidate(10.0, None, params2).blocked is True   # 方法调用也被禁
