@@ -9,6 +9,8 @@ from app.models.review_decision import ReviewDecision
 from app.models.shop import Shop
 from app.models.listing_draft import ListingDraft
 from app.models.publish_pace import PublishPace
+from app.models.product_image import ProductImage
+from app.models.category_map import CategoryMap
 
 __all__ = [
     "User",
@@ -22,4 +24,6 @@ __all__ = [
     "Shop",
     "ListingDraft",
     "PublishPace",
+    "ProductImage",
+    "CategoryMap",
 ]
