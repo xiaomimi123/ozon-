@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Card, Form, InputNumber, Switch, Button, Space, Row, Col, Statistic, Tag, message } from "antd";
+import { Card, Form, InputNumber, Switch, Button, Space, Row, Col, Statistic, message } from "antd";
 import { getPace, savePace, Pace } from "../api/pace";
 import { schedule, tick, getMonitor } from "../api/publish";
 
@@ -19,13 +19,15 @@ export default function PublishMonitor() {
   useEffect(() => { if (!taskId) return; loadPace(); loadMon();
     // 实时 WS(断开回退轮询)
     let poll: any;
+    const startPoll = () => { if (!poll) poll = setInterval(loadMon, 5000); };
     try {
       const proto = location.protocol === "https:" ? "wss" : "ws";
       const ws = new WebSocket(`${proto}://${location.host}/ws/progress`);
       ws.onmessage = () => loadMon();
-      ws.onerror = () => { poll = setInterval(loadMon, 5000); };
+      ws.onerror = () => startPoll();
+      ws.onclose = () => startPoll();
       wsRef.current = ws;
-    } catch { poll = setInterval(loadMon, 5000); }
+    } catch { startPoll(); }
     return () => { wsRef.current?.close(); if (poll) clearInterval(poll); };
   }, [taskId]);
 
