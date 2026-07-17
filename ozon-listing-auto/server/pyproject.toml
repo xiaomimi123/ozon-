@@ -1,0 +1,40 @@
+[project]
+name = "ozon-listing-auto-server"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.111",
+  "uvicorn[standard]>=0.30",
+  "sqlalchemy[asyncio]>=2.0",
+  "asyncpg>=0.29",
+  "alembic>=1.13",
+  "arq>=0.26",
+  "redis>=5.0",
+  "httpx>=0.27",
+  "structlog>=24.1",
+  "pydantic>=2.7",
+  "pydantic-settings>=2.3",
+  "python-jose[cryptography]>=3.3",
+  "passlib[bcrypt]>=1.7",
+  # passlib 1.7.4（最新版）的 bcrypt 后端自检代码不兼容 bcrypt>=4.1 更严格的 72
+  # 字节报错行为，会在 CryptContext 初始化时抛 ValueError，故锁定 4.0.x。
+  "bcrypt>=4.0,<4.1",
+  "cryptography>=42.0",
+  "python-multipart>=0.0.9",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.2", "pytest-asyncio>=0.23", "aiosqlite>=0.20"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = ["live: 需真实网络访问 Ozon 的冒烟测试(默认不跑)"]
+addopts = "-m 'not live'"
+filterwarnings = [
+  "ignore:'crypt' is deprecated and slated for removal.*:DeprecationWarning",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]
