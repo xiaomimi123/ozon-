@@ -1,5 +1,5 @@
 """商品列表接口：按任务 + 六维筛选条件分页查询。"""
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import get_session
@@ -11,7 +11,7 @@ from app.services.filtering import ProductFilter, build_conditions
 router = APIRouter(prefix="/products", tags=["products"])
 
 @router.get("")
-async def list_products(task_id: int, page: int = 1, page_size: int = 20,
+async def list_products(task_id: int, page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=200),
                         f: ProductFilter = Depends(),
                         s: AsyncSession = Depends(get_session), _: User = Depends(get_current_user)):
     conds = build_conditions(f)
