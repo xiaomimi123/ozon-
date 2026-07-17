@@ -42,5 +42,6 @@ class OzonProduct(Base):
     parent_sku: Mapped[str | None] = mapped_column(String(64), nullable=True)
     phash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     embedding: Mapped[list | None] = mapped_column(_VECTOR, nullable=True)
+    barcode: Mapped[str | None] = mapped_column(String(64), nullable=True)
     raw: Mapped[dict | None] = mapped_column(_JSONB, nullable=True)
     collected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
