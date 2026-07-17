@@ -18,7 +18,7 @@ class LocalProvider:
         h = hashlib.sha1(seed + op.encode()).hexdigest()[:12]
         fname = f"{op}_{h}.png"
         img.save(os.path.join(self.static_dir, fname), format="PNG")
-        return f"/static/{fname}"
+        return f"/static/images/{fname}"
 
     async def process(self, *, image: bytes, op: str, params: dict) -> ImageResult:
         meta: dict = {"op": op, "degraded": False}

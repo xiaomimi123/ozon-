@@ -1,4 +1,5 @@
 import io
+import os
 import pytest
 from PIL import Image
 from app.services.imagegen.factory import get_image_provider, process_op
@@ -15,8 +16,7 @@ async def test_local_whitebg_flattens_alpha(tmp_path):
     prov = get_image_provider("local", static_dir=str(tmp_path))
     res = await prov.process(image=_png_rgba(), op="whitebg", params={})
     assert res.provider == "local"
-    out = Image.open(res.url.replace("/static", str(tmp_path)) if res.url.startswith("/static")
-                     else str(tmp_path) + "/" + res.url.split("/")[-1])
+    out = Image.open(os.path.join(str(tmp_path), res.url.split("/")[-1]))
     # 产物无 alpha（白底合成）；随便取一像素应不透明
     assert out.mode in ("RGB",)
 
@@ -25,8 +25,7 @@ async def test_local_whitebg_flattens_alpha(tmp_path):
 async def test_local_crop_norm_dims(tmp_path):
     prov = get_image_provider("local", static_dir=str(tmp_path))
     res = await prov.process(image=_png_rgba(120, 60), op="crop_norm", params={"size": [100, 100]})
-    from PIL import Image as I
-    out = I.open(str(tmp_path) + "/" + res.url.split("/")[-1])
+    out = Image.open(os.path.join(str(tmp_path), res.url.split("/")[-1]))
     assert out.size == (100, 100)
 
 
