@@ -24,7 +24,10 @@ async def write(body: ImagegenIn, s: AsyncSession = Depends(get_session),
                 u: User = Depends(require_role("admin"))):
     await store.set_value(s, _CAT, "provider", body.provider, is_secret=False, updated_by=u.id)
     await store.set_value(s, _CAT, "img_base_url", body.img_base_url, is_secret=False, updated_by=u.id)
-    await store.set_value(s, _CAT, "img_api_key", body.img_api_key, is_secret=True, updated_by=u.id)
+    if body.img_api_key:
+        # 留空则不更改：前端 GET 脱敏为 "***" 且加载时强制清空该字段，
+        # 若无条件覆盖会在管理员只改其他字段时静默清空已存密钥。
+        await store.set_value(s, _CAT, "img_api_key", body.img_api_key, is_secret=True, updated_by=u.id)
     await store.set_value(s, _CAT, "img_model", body.img_model, is_secret=False, updated_by=u.id)
     await store.set_value(s, _CAT, "fallback", body.fallback, is_secret=False, updated_by=u.id)
     await s.commit()

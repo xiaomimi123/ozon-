@@ -54,6 +54,26 @@ async def test_imagegen_settings_masks_api_key(client, db_session):
 
 
 @pytest.mark.asyncio
+async def test_imagegen_settings_blank_api_key_keeps_stored_key(client, db_session):
+    """PUT /settings/imagegen 留空 img_api_key 时不应覆盖已存密钥(UI 文案"留空则不更改")。"""
+    from app.services import settings_store
+
+    tid, cid, h = await _seed_adopted_create(client, db_session)
+    await client.put("/settings/imagegen", headers=h, json={
+        "provider": "mock", "img_base_url": "https://x/v1", "img_api_key": "secret-123", "img_model": "wanx"})
+
+    r2 = await client.put("/settings/imagegen", headers=h, json={
+        "provider": "mock", "img_base_url": "https://y/v2", "img_api_key": "", "img_model": "wanx"})
+    assert r2.status_code == 200
+
+    stored = await settings_store.get_value(db_session, "imagegen", "img_api_key")
+    assert stored == "secret-123"
+
+    g = await client.get("/settings/imagegen", headers=h)
+    assert g.json()["img_base_url"] == "https://y/v2"
+
+
+@pytest.mark.asyncio
 async def test_categories_tree_endpoint(client, db_session):
     tid, cid, h = await _seed_adopted_create(client, db_session)
     r = await client.get("/categories", headers=h)
