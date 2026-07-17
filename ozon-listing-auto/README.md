@@ -1,6 +1,6 @@
-# Ozon 跟卖/铺货自动化系统（M1 + M2 + M3 + M4）
+# Ozon 跟卖/铺货自动化系统（M1 + M2 + M3 + M4 + M5）
 
-面向 Ozon 平台跟卖/铺货场景的自动化辅助系统。M1 完成骨架搭建：登录鉴权、采集任务管理（跟卖/自建两种模式、mock/composer/apify 三种数据源）、商品入库去重、六维条件筛选浏览、WebSocket 采集进度推送，以及 Docker Compose 一键启动。M2 在此基础上新增货源匹配：账号池、双源（1688/拼多多）候选采集、跨平台 CLIP 去重、匹配/候选管理 API。M3 在匹配候选之上新增五维评分与审核台：图像/标题/属性/价格/供应商五维打分 + tier 分级、LLM 抽象（mock/OpenAI 兼容，用于译标题与抽属性）、人工审核（采用/拒绝）或按阈值自动采用、评分/审核 API + 审核台前端。M4 在已采用候选之上新增跟卖定价与挂靠上架：定价引擎（内置毛利率反推 / simpleeval 自定义公式 + 最低价保护）、Ozon 写入抽象（MockOzonSeller/RealOzonSeller）、草稿生成与人工确认闸门（或按阈值自动确认）、挂靠上架回写 Ozon 商品 ID、店铺凭据管理（Fernet 加密）、上架 API + 前端 ListingReview/Shops 页面。
+面向 Ozon 平台跟卖/铺货场景的自动化辅助系统。M1 完成骨架搭建：登录鉴权、采集任务管理（跟卖/自建两种模式、mock/composer/apify 三种数据源）、商品入库去重、六维条件筛选浏览、WebSocket 采集进度推送，以及 Docker Compose 一键启动。M2 在此基础上新增货源匹配：账号池、双源（1688/拼多多）候选采集、跨平台 CLIP 去重、匹配/候选管理 API。M3 在匹配候选之上新增五维评分与审核台：图像/标题/属性/价格/供应商五维打分 + tier 分级、LLM 抽象（mock/OpenAI 兼容，用于译标题与抽属性）、人工审核（采用/拒绝）或按阈值自动采用、评分/审核 API + 审核台前端。M4 在已采用候选之上新增跟卖定价与挂靠上架：定价引擎（内置毛利率反推 / simpleeval 自定义公式 + 最低价保护）、Ozon 写入抽象（MockOzonSeller/RealOzonSeller）、草稿生成与人工确认闸门（或按阈值自动确认）、挂靠上架回写 Ozon 商品 ID、店铺凭据管理（Fernet 加密）、上架 API + 前端 ListingReview/Shops 页面。M5 在确认草稿之上新增**上架节奏调度**：节奏配置（随机间隔/每日上限/活跃时段/是否等 Ozon 审核通过再推进下一条）、`plan_schedule` 把已确认草稿排出 `scheduled_at`、`tick_publish` 按节奏逐一挂靠并支持等审核门、ARQ cron 每分钟自动 tick、跨进程实时进度广播（`Broadcaster` memory/redis 双后端可切）、节奏/排期/tick/监控 API，以及首个使用 WebSocket 的前端页面 PublishMonitor。
 
 ## 技术栈
 
@@ -72,6 +72,8 @@ npm run build    # 生产构建
 | `LLM_BASE_URL` | `LLM_PROVIDER=openai` 时的接口地址 | `https://dashscope.aliyuncs.com/compatible-mode/v1`（通义千问 DashScope） |
 | `LLM_API_KEY` | `LLM_PROVIDER=openai` 时的 API key | 空 |
 | `LLM_MODEL` | `LLM_PROVIDER=openai` 时使用的模型名 | `qwen-plus` |
+| `OZON_SELLER_PROVIDER` | Ozon 跟卖挂靠：`mock`（默认，无需真实凭据）或 `real`（真实调用 Ozon Seller API，需店铺真实凭据）。仅影响**异步/worker 路径**（`run_publish`、`run_publish_tick` 及其 cron），`sync=true` 的同步路径当前仍固定用 `mock`，见 M4/M5 章节说明 | `mock` |
+| `PROGRESS_BACKEND` | WS 进度广播后端：`memory`（默认，单进程本地 fan-out）或 `redis`（Redis pub/sub 跨进程广播，`worker`/`api` 分属不同进程时需要，例如生产环境 cron tick 的进度要推给 API 进程持有的 WS 连接） | `memory` |
 
 生成生产用 `FERNET_KEY`：
 
@@ -88,27 +90,30 @@ ozon-listing-auto/
 ├── server/               # FastAPI 后端
 │   ├── app/
 │   │   ├── api/          # 路由（auth/tasks/collect/products/settings/ws/accounts/match/candidates/
-│   │   │                 #   score/review/shops/listing）
-│   │   ├── core/         # 配置、数据库、鉴权、加密等基础设施
+│   │   │                 #   score/review/shops/listing/pace/publish）
+│   │   ├── core/         # 配置、数据库、鉴权、加密、progress.py（Broadcaster 进度广播 memory/redis）等基础设施
 │   │   ├── models/       # SQLAlchemy ORM 模型（含 source_account/supply_candidate/review_decision/
-│   │   │                 #   shop/listing_draft）
+│   │   │                 #   shop/listing_draft/publish_pace）
 │   │   ├── services/     # 业务逻辑：六维筛选、入库去重、ozon_market 采集 provider、
 │   │   │                 #   sources/（1688/拼多多货源 provider）、embedding/（mock/CLIP）、账号池、候选去重入库、
 │   │   │                 #   scoring.py（五维评分引擎+tier）、review.py（审核队列/采用拒绝/自动采用/并发锁）、
 │   │   │                 #   llm/（mock/OpenAI 兼容 LLM 抽象，译标题+抽属性）、
 │   │   │                 #   pricing.py（内置反推+simpleeval 自定义公式定价引擎+最低价保护）、
-│   │   │                 #   ozon_seller/（Ozon 写入抽象 mock/real）、listing_builder.py（候选+定价→跟卖草稿）
+│   │   │                 #   ozon_seller/（Ozon 写入抽象 mock/real, get_product_status 查审核状态）、
+│   │   │                 #   listing_builder.py（候选+定价→跟卖草稿）、publish_scheduler.py（节奏调度 plan_schedule）
 │   │   ├── workers/      # ARQ 后台任务（采集 collector、货源匹配 matcher、评分 scorer、上架 publisher，
-│   │   │                 #   均支持断点续传/暂停）
+│   │   │                 #   均支持断点续传/暂停；publisher.py 含 run_publish 直发 + tick_publish/run_publish_tick
+│   │   │                 #   节奏 tick，后者按分钟 cron 调度）
 │   │   └── seed.py       # 启动种子：幂等创建首个管理员
 │   ├── alembic/          # 数据库迁移
 │   └── tests/
-├── docs/                 # 里程碑设计文档（如 M2-货源匹配说明.md、M3-评分审核说明.md、M4-定价上架说明.md）
+├── docs/                 # 里程碑设计文档（如 M2-货源匹配说明.md、M3-评分审核说明.md、M4-定价上架说明.md、
+│                         #   M5-节奏调度说明.md）
 └── web/                  # React + Vite 前端
     ├── src/
     │   ├── api/
     │   ├── pages/         # 登录、任务中心、商品列表、审核台（ReviewBoard）、上架审核（ListingReview）、
-    │   │                  #   店铺管理（Shops）等页面
+    │   │                  #   店铺管理（Shops）、上架监控（PublishMonitor，节奏配置+队列监控+实时 WS）等页面
     │   └── store/
     └── nginx.conf         # 生产镜像内 nginx：SPA + /api、/ws 反代
 ```
@@ -166,19 +171,32 @@ ozon-listing-auto/
   - 划线价 `strike` 按 `strike_coeff`（默认 1.3）系数从售价换算，仅供参考展示。
 - **Ozon 写入抽象**（`app/services/ozon_seller/`，`OzonSellerProvider` 协议 `create_follow_offer()`）：
   - `MockOzonSeller`（默认，`get_ozon_seller("mock")`）：确定性返回挂靠成功，`ozon_product_id` 固定为 `OZ-{offer_id}`，供本地/CI 全链路验证，无需任何外部依赖。
-  - `RealOzonSeller`（`get_ozon_seller("real")`）：以店铺 `Client-Id`/`Api-Key` 调 Ozon Seller API 创建跟卖 offer 的真实实现；**当前接口地址与请求体是占位实现（`_ENDPOINT` 指向 `product/import`），真实跟卖端点字段需在 live 联调时校正**，且目前后端代码（`POST /listing/publish` 同步路径与 `run_publish` 异步 worker）尚**硬编码使用 `mock`**，暂无环境变量/配置项可一键切到 `real`——要跑通真实挂靠需临时改动 `app/api/listing.py` / `app/workers/publisher.py` 里的 `get_ozon_seller("mock")` 为 `get_ozon_seller("real")`，详见 [`docs/M4-定价上架说明.md`](docs/M4-定价上架说明.md) 第 5 节。
+  - `RealOzonSeller`（`get_ozon_seller("real")`）：以店铺 `Client-Id`/`Api-Key` 调 Ozon Seller API 创建跟卖 offer + 查询审核状态（`get_product_status`，M5 新增）的真实实现；**接口地址与请求体仍是占位实现**（`create_follow_offer` 的 `_ENDPOINT` 指向 `product/import`、`get_product_status` 指向 `product/info` 且返回值恒为 `pending`），**真实跟卖端点字段与审核状态映射需在 live 联调时校正**。M5 起挂靠 seller 由环境变量 **`OZON_SELLER_PROVIDER`**（`mock`/`real`，默认 `mock`）控制，但**只影响异步/worker 路径**（`POST /listing/publish?sync=false` 的 `run_publish`、`POST /publish/tick?sync=false` 入队后由 cron/`run_publish_tick` 执行）；`sync=true` 的同步路径（两个接口皆是）**仍固定使用 `mock`**，便于本地/演示/测试快速看到结果而不误触真实 Ozon 写入。要在生产环境真实挂靠，设置 `OZON_SELLER_PROVIDER=real` 并配好店铺真实凭据、始终走 `sync=false` 异步路径即可，无需再改代码；详见 [`docs/M4-定价上架说明.md`](docs/M4-定价上架说明.md) 第 5 节与 [`docs/M5-节奏调度说明.md`](docs/M5-节奏调度说明.md)。
 - **草稿生成**（`app/services/listing_builder.py`，`POST /listing/build`）：把某任务下已采用（`adopted`/`auto_adopted`）的候选按定价参数逐个生成 `listing_drafts` 记录（幂等，同一候选不会重复生成），写入进价 `cost`、售价 `price`、毛利率 `margin`、定价明细 `pricing_detail`；被最低价拦截的候选草稿状态为 `below_min`，其余为 `draft`。
 - **确认闸门与自动确认**（`app/workers/publisher.py`）：草稿默认需人工 `POST /listing/{id}/confirm` 确认（`draft → confirmed`）才能进入挂靠；若任务 `review_config.listing_review_required=false`，`POST /listing/auto-confirm` 会按可选阈值 `listing_score_min`（对比候选 `score_total`）批量把达标草稿从 `draft` 置为 `confirmed`。
-- **挂靠上架**（`POST /listing/publish`）：对该任务下 `confirmed` 状态的草稿逐条调用 `OzonSellerProvider.create_follow_offer()`，成功则草稿状态置为 `published` 并回写 `ozon_result.ozon_product_id`；失败（含店铺凭据解密失败等异常）则置为 `failed` 并记录 `error`，单条失败不影响同批其余草稿。`sync=true` 请求内同步跑完（当前固定用 `mock` seller，便于本地/演示/测试）；`sync=false`（默认）经 ARQ 入队由 `worker` 异步执行 `app.workers.publisher.run_publish`（当前同样固定用 `mock` seller）。
+- **挂靠上架**（`POST /listing/publish`）：对该任务下 `confirmed` 状态的草稿逐条调用 `OzonSellerProvider.create_follow_offer()`，成功则草稿状态置为 `published` 并回写 `ozon_result.ozon_product_id`；失败（含店铺凭据解密失败等异常）则置为 `failed` 并记录 `error`，单条失败不影响同批其余草稿。`sync=true` 请求内同步跑完（固定用 `mock` seller，便于本地/演示/测试）；`sync=false`（默认）经 ARQ 入队由 `worker` 异步执行 `app.workers.publisher.run_publish`（按 `OZON_SELLER_PROVIDER` 选 seller，生产设为 `real` 即走真实挂靠）。**M4 是「确认后直接挂靠全部 `confirmed` 草稿」，不经排期/节奏；M5 新增的 `/publish/schedule` + `/publish/tick` 是在此之上加一层节奏调度，两条路径并存**——不想要节奏调度时仍可直接用本节的 `/listing/publish`。
 - **店铺凭据管理**（`/shops`，admin，`app/models/shop.py`）：Ozon 店铺 `Client-Id`（明文）+ `Api-Key`（`FERNET_KEY` 加密存储）CRUD，响应统一脱敏（不回传 `api_key` 字段）；草稿关联 `shop_id` 后挂靠时按店铺解密取用凭据。
 - **上架 API**（`/listing`，`app/api/listing.py`）：`POST /listing/build`（operator 及以上）、`GET /listing/drafts`（按任务/状态过滤）、`POST /listing/{id}/confirm`（reviewer/admin）、`POST /listing/auto-confirm`（operator 及以上）、`POST /listing/publish`（publisher/admin，`sync` 参数控制同步/入队）、`GET /listing/monitor`（按状态统计草稿数量）。
 - **前端**：`ListingReview`（`/listing`）——按任务生成草稿、选店铺、草稿列表展示进价/售价/毛利率/状态/Ozon 回写结果，逐条确认或按开关批量自动确认、一键挂靠；`Shops`（`/shops`）——新增/列表/删除店铺，`Api-Key` 输入框脱敏、列表不回显凭据。
 
 详细操作流程（建店铺→配定价→build→确认→publish→切真实）见 [`docs/M4-定价上架说明.md`](docs/M4-定价上架说明.md)。
 
+## M5 已实现功能（上架节奏调度）
+
+- **节奏配置**（`publish_pace` 表 + `app/models/publish_pace.py`，`/pace` API）：`min_interval_sec`/`max_interval_sec`（两条上架之间的随机等待区间，默认 60~180 秒）、`daily_limit`（每日上架条数上限，默认 200，`≤0` 视为不限）、`active_hours`（活跃时段 `[start, end]` 小时数组，默认 `[9, 23]`，排期落在时段外会自动挪到下一个时段起点）、`wait_ozon_approval`（是否等上一批提交审核的草稿在 Ozon 侧出结果后才推进下一条，默认 `true`）。支持按任务覆盖（`task_id` 指定）或全局默认（`task_id=null`）：`GET /pace?task_id=<id>`（operator 及以上，任务未配置时按「任务级 → 全局默认 → 内置 `DEFAULT_PACE`」三级回退返回）、`PUT /pace?task_id=<id>`（写入/更新该任务或全局的节奏配置）。
+- **排期调度**（`app/services/publish_scheduler.py::plan_schedule`，`POST /publish/schedule`，operator 及以上）：对该任务下所有 `confirmed` 且未排期（`scheduled_at is null`）的草稿，按节奏配置逐条累加「随机间隔」算出候选上架时间，用 `next_active_window()` 把落在 `active_hours` 时段外的时间点挪到下一个时段起点，并按 `daily_limit` 控制同一天排入的条数（超限则顺延到次日时段起点）；排定后草稿状态由 `confirmed` 置为 `scheduled` 并写入 `scheduled_at`。
+- **逐一挂靠 + 等审核门**（`app/workers/publisher.py::tick_publish`）：每次 tick 先检查该任务是否有 `pending_review`（已提交待 Ozon 审核）的草稿——若 `wait_ozon_approval=true` 且存在，逐条调用 `OzonSellerProvider.get_product_status()` 轮询，只要有一条仍未出结果（非 `approved`/`rejected`）本轮就不再推进下一条（`approved` 转 `published`，`rejected` 转 `failed` 并记录 `error`）；否则取 `scheduled_at <= now` 的下一批到期草稿（默认 `max_batch=1`，逐条挂靠）调用 `create_follow_offer()`，成功后视 `wait_ozon_approval` 置为 `pending_review`（等审核）或直接 `published`（不等审核），失败置 `failed`。每条草稿独立 session + 独立 try/except，单条失败不影响同批其余草稿；每挂靠一条（第二步）通过 `Broadcaster` 广播一次进度（第一步的审核轮询本身不广播）。
+- **周期调度**（`app/workers/arq_worker.py`）：`run_publish_tick`（ARQ cron，每分钟触发一次）扫描所有存在到期 `scheduled` 或 `pending_review` 草稿的任务并逐个 `tick_publish`；也可手动触发 `POST /publish/tick?task_id=<id>&sync=true|false`（publisher/admin）——`sync=true` 请求内同步跑一次（固定用 `mock` seller，便于演示/测试立即看到效果），`sync=false`（默认）经 ARQ 入队立即触发一次 `run_publish_tick`（按 `OZON_SELLER_PROVIDER` 选 seller）。
+- **跨进程实时进度广播**（`app/core/progress.py::Broadcaster`）：M1 起 WS 进度推送一直是「单进程内 fan-out」，M5 起可切换后端——`memory`（默认）行为不变；`redis`（`PROGRESS_BACKEND=redis`）下 `publish()` 改为 `PUBLISH` 到 Redis 频道 `ws:progress`，API 进程在 `lifespan` 里额外起一个后台协程订阅该频道并本地 fan-out 给自己持有的 WS 连接——解决了 M5 场景下 `worker`/cron 进程产生的 tick 进度需要广播到 `api` 进程所持有的 WS 连接、而两者不在同一进程内的问题。
+- **监控 API**（`GET /publish/monitor?task_id=<id>`，任意登录用户）：按状态（`draft`/`confirmed`/`scheduled`/`pending_review`/`published`/`failed`）统计草稿数量，附带下一条待上架草稿的 `next_scheduled_at`（`scheduled` 中最早的 `scheduled_at`）与当前生效的节奏配置 `pace`。
+- **`OzonSellerProvider` 新增 `get_product_status()`**（M5 起协议方法，`app/services/ozon_seller/base.py`）：`MockOzonSeller` 默认返回 `approved`，可在构造时注入 `pending_ids` 集合使指定 `ozon_product_id` 返回 `pending`，供测试/本地演示模拟「审核中」；`RealOzonSeller` 为占位实现（请求 `product/info`，**真实的 Ozon 审核状态字段与 approved/pending/rejected 映射需在 live 联调时校正**，当前恒返回 `pending`）。
+- **前端 PublishMonitor**（`/monitor`，`web/src/pages/PublishMonitor.tsx`，**M5 是首个使用 WebSocket 的前端页面**）：节奏配置表单（读取/保存 `/pace`）、「开始排期」（`/publish/schedule`）、「手动上架一条」（`/publish/tick?sync=true`）按钮，以及按状态分组的队列统计卡片（草稿/已确认/已排期/审核中/已上架/失败）+ 下一条 ETA。连上 `/ws/progress` 后收到任意消息即刷新监控数据实现近实时更新；WS 连接失败/出错/断开（`onerror`/`onclose`）都会回退为每 5 秒轮询 `GET /publish/monitor`，避免 WS 异常导致页面静默停更。
+
+详细操作流程（配节奏→排期→tick→监控，生产切 `PROGRESS_BACKEND=redis` + `OZON_SELLER_PROVIDER=real`）见 [`docs/M5-节奏调度说明.md`](docs/M5-节奏调度说明.md)。
+
 ## 测试
 
-后端（83 个用例，默认跳过标记为 `live` 的真实网络冒烟测试，覆盖 M1 采集 + M2 货源匹配 + M3 评分审核 + M4 定价上架全链路）：
+后端（100 个用例，默认跳过标记为 `live` 的真实网络冒烟测试，覆盖 M1 采集 + M2 货源匹配 + M3 评分审核 + M4 定价上架 + M5 节奏调度全链路）：
 
 ```bash
 cd server && .venv/bin/python -m pytest -q
@@ -209,7 +227,7 @@ cd web && npx vitest run
 - **M1**：采集入库（已完成）——登录鉴权、采集任务（跟卖/自建）、六维筛选、WebSocket 进度推送
 - **M2**：货源匹配（已完成）——账号池、双源（1688/拼多多）候选采集、CLIP 跨平台去重、匹配/候选 API
 - **M3**：五维评分与审核台（已完成）——五维评分引擎+tier、LLM 抽象（mock/OpenAI 兼容）、审核台（采用/拒绝/自动采用）、评分/审核 API
-- **M4**：跟卖定价与挂靠上架（已完成）——定价引擎（内置反推/自定义公式+最低价保护）、Ozon 写入抽象（mock/real）、草稿生成/确认闸门/自动确认、挂靠上架回写 Ozon 商品 ID、店铺凭据管理、上架 API + 前端。**注意**：M4 是确认后直接挂靠，暂无节奏/时间调度，节奏调度是 M5 的范围
-- **M5**：上架节奏调度（待开发）
+- **M4**：跟卖定价与挂靠上架（已完成）——定价引擎（内置反推/自定义公式+最低价保护）、Ozon 写入抽象（mock/real）、草稿生成/确认闸门/自动确认、挂靠上架回写 Ozon 商品 ID、店铺凭据管理、上架 API + 前端。`POST /listing/publish` 仍保留「确认后直接挂靠全部 `confirmed` 草稿」的直发路径，不经排期
+- **M5**：上架节奏调度（已完成）——节奏配置 `/pace`、`plan_schedule` 排期（随机间隔/活跃时段/每日上限）、`tick_publish` 逐一挂靠 + 等 Ozon 审核门、ARQ cron 每分钟自动 tick、`Broadcaster` 跨进程实时进度（memory/redis 可切）、排期/tick/监控 API、首个 WS 前端页面 PublishMonitor
 - **M6**：自建改图与类目映射（待开发）
 - **M7**：公网部署（Nginx + HTTPS）（待开发）
