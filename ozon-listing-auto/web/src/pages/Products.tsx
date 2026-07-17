@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Card, Form, InputNumber, Input, Button, Table, Space, Image } from "antd";
+import { Card, Form, InputNumber, Input, DatePicker, Button, Table, Space, Image, message } from "antd";
 import { listProducts, ProductFilter } from "../api/products";
 
 export default function Products() {
@@ -9,9 +9,18 @@ export default function Products() {
   const [form] = Form.useForm();
 
   const query = async (p = 1) => {
-    if (!taskId) return;
-    const f: ProductFilter = form.getFieldsValue();
-    setData(await listProducts(taskId, f, p)); setPage(p);
+    if (!taskId) { message.warning("请先输入任务ID"); return; }
+    const raw: any = form.getFieldsValue();
+    const f: ProductFilter = { ...raw };
+    if (raw.listed_after && typeof raw.listed_after.toISOString === "function") {
+      f.listed_after = raw.listed_after.toISOString();
+    }
+    try {
+      setData(await listProducts(taskId, f, p));
+      setPage(p);
+    } catch {
+      message.error("查询失败，请稍后重试");
+    }
   };
 
   return (
@@ -23,6 +32,7 @@ export default function Products() {
           <Form.Item name="return_rate_max" label="退货率≤"><InputNumber step={0.01} /></Form.Item>
           <Form.Item name="rating_min" label="评分≥"><InputNumber step={0.1} /></Form.Item>
           <Form.Item name="weight_max" label="重量≤"><InputNumber step={0.1} /></Form.Item>
+          <Form.Item name="listed_after" label="上架时间≥"><DatePicker /></Form.Item>
           <Form.Item name="follow_max" label="跟卖数≤"><InputNumber /></Form.Item>
           <Form.Item name="keyword" label="标题"><Input /></Form.Item>
           <Space>
