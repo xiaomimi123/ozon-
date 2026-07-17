@@ -13,6 +13,8 @@ from app.api.products import router as products_router
 from app.api.accounts import router as accounts_router
 from app.api.match import router as match_router
 from app.api.candidates import router as candidates_router
+from app.api.score import router as score_router
+from app.api.review import router as review_router
 
 setup_logging()
 
@@ -38,6 +40,8 @@ app.include_router(products_router)
 app.include_router(accounts_router)
 app.include_router(match_router)
 app.include_router(candidates_router)
+app.include_router(score_router)
+app.include_router(review_router)
 
 @app.get("/health")
 async def health():
