@@ -43,3 +43,9 @@ async def test_decide_adopt_reject(db_session):
     assert cand1.status == "adopted" and cand2.status == "rejected"
     cnt = (await db_session.execute(select(func.count()).select_from(ReviewDecision).where(ReviewDecision.task_id == tid))).scalar_one()
     assert cnt == 2
+
+@pytest.mark.asyncio
+async def test_decide_rejects_invalid_decision(db_session):
+    tid, pid, c1, c2 = await _seed(db_session, {"source_review_required": True, "source_score_min": None})
+    with pytest.raises(ValueError):
+        await decide(db_session, c1, None, "bogus")

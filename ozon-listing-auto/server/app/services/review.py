@@ -58,6 +58,8 @@ async def get_review_queue(session: AsyncSession, task_id: int, page: int = 1, p
 
 async def decide(session: AsyncSession, candidate_id: int, reviewer_id: int | None,
                  decision: str, note: str | None = None, *, lock=None) -> dict:
+    if decision not in ("adopt", "reject"):
+        raise ValueError(f"非法审核决策: {decision}")
     cand = (await session.execute(select(SupplyCandidate).where(SupplyCandidate.id == candidate_id))).scalar_one()
     lock = lock or review_lock(cand.ozon_product_id)
     async with lock:
