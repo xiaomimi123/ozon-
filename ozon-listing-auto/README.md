@@ -1,6 +1,6 @@
-# Ozon 跟卖/铺货自动化系统（M1 + M2 + M3）
+# Ozon 跟卖/铺货自动化系统（M1 + M2 + M3 + M4）
 
-面向 Ozon 平台跟卖/铺货场景的自动化辅助系统。M1 完成骨架搭建：登录鉴权、采集任务管理（跟卖/自建两种模式、mock/composer/apify 三种数据源）、商品入库去重、六维条件筛选浏览、WebSocket 采集进度推送，以及 Docker Compose 一键启动。M2 在此基础上新增货源匹配：账号池、双源（1688/拼多多）候选采集、跨平台 CLIP 去重、匹配/候选管理 API。M3 在匹配候选之上新增五维评分与审核台：图像/标题/属性/价格/供应商五维打分 + tier 分级、LLM 抽象（mock/OpenAI 兼容，用于译标题与抽属性）、人工审核（采用/拒绝）或按阈值自动采用、评分/审核 API + 审核台前端。
+面向 Ozon 平台跟卖/铺货场景的自动化辅助系统。M1 完成骨架搭建：登录鉴权、采集任务管理（跟卖/自建两种模式、mock/composer/apify 三种数据源）、商品入库去重、六维条件筛选浏览、WebSocket 采集进度推送，以及 Docker Compose 一键启动。M2 在此基础上新增货源匹配：账号池、双源（1688/拼多多）候选采集、跨平台 CLIP 去重、匹配/候选管理 API。M3 在匹配候选之上新增五维评分与审核台：图像/标题/属性/价格/供应商五维打分 + tier 分级、LLM 抽象（mock/OpenAI 兼容，用于译标题与抽属性）、人工审核（采用/拒绝）或按阈值自动采用、评分/审核 API + 审核台前端。M4 在已采用候选之上新增跟卖定价与挂靠上架：定价引擎（内置毛利率反推 / simpleeval 自定义公式 + 最低价保护）、Ozon 写入抽象（MockOzonSeller/RealOzonSeller）、草稿生成与人工确认闸门（或按阈值自动确认）、挂靠上架回写 Ozon 商品 ID、店铺凭据管理（Fernet 加密）、上架 API + 前端 ListingReview/Shops 页面。
 
 ## 技术栈
 
@@ -63,7 +63,7 @@ npm run build    # 生产构建
 | `DATABASE_URL` | 后端数据库连接串（compose 中已固定指向 `db` 服务） | `postgresql+asyncpg://ozon:ozon@localhost:5432/ozon` |
 | `REDIS_URL` | Redis 连接串（compose 中已固定指向 `redis` 服务） | `redis://localhost:6379/0` |
 | `JWT_SECRET` | JWT 签名密钥，生产环境务必修改 | `dev-secret-change-me` |
-| `FERNET_KEY` | 对称加密密钥（用于加密存储配置中心的第三方凭据，如 cookie/代理/API key） | 开发默认值，生产务必替换 |
+| `FERNET_KEY` | 对称加密密钥（用于加密存储配置中心的第三方凭据，如 cookie/代理/API key；以及 M4 店铺表 `shops.api_key_encrypted`） | 开发默认值，生产务必替换 |
 | `ADMIN_USER` | 启动种子创建的首个管理员用户名 | `admin` |
 | `ADMIN_PASSWORD` | 启动种子创建的首个管理员密码 | `admin123` |
 | `EMBEDDER` | 货源匹配用的图像 embedder：`mock`（无需 torch）或 `clip`（真实 `ChineseClipEmbedder`） | `mock` |
@@ -87,22 +87,28 @@ ozon-listing-auto/
 ├── .env.example
 ├── server/               # FastAPI 后端
 │   ├── app/
-│   │   ├── api/          # 路由（auth/tasks/collect/products/settings/ws/accounts/match/candidates/score/review）
+│   │   ├── api/          # 路由（auth/tasks/collect/products/settings/ws/accounts/match/candidates/
+│   │   │                 #   score/review/shops/listing）
 │   │   ├── core/         # 配置、数据库、鉴权、加密等基础设施
-│   │   ├── models/       # SQLAlchemy ORM 模型（含 source_account/supply_candidate/review_decision）
+│   │   ├── models/       # SQLAlchemy ORM 模型（含 source_account/supply_candidate/review_decision/
+│   │   │                 #   shop/listing_draft）
 │   │   ├── services/     # 业务逻辑：六维筛选、入库去重、ozon_market 采集 provider、
 │   │   │                 #   sources/（1688/拼多多货源 provider）、embedding/（mock/CLIP）、账号池、候选去重入库、
 │   │   │                 #   scoring.py（五维评分引擎+tier）、review.py（审核队列/采用拒绝/自动采用/并发锁）、
-│   │   │                 #   llm/（mock/OpenAI 兼容 LLM 抽象，译标题+抽属性）
-│   │   ├── workers/      # ARQ 后台任务（采集 collector、货源匹配 matcher、评分 scorer，均支持断点续传/暂停）
+│   │   │                 #   llm/（mock/OpenAI 兼容 LLM 抽象，译标题+抽属性）、
+│   │   │                 #   pricing.py（内置反推+simpleeval 自定义公式定价引擎+最低价保护）、
+│   │   │                 #   ozon_seller/（Ozon 写入抽象 mock/real）、listing_builder.py（候选+定价→跟卖草稿）
+│   │   ├── workers/      # ARQ 后台任务（采集 collector、货源匹配 matcher、评分 scorer、上架 publisher，
+│   │   │                 #   均支持断点续传/暂停）
 │   │   └── seed.py       # 启动种子：幂等创建首个管理员
 │   ├── alembic/          # 数据库迁移
 │   └── tests/
-├── docs/                 # 里程碑设计文档（如 M2-货源匹配说明.md、M3-评分审核说明.md）
+├── docs/                 # 里程碑设计文档（如 M2-货源匹配说明.md、M3-评分审核说明.md、M4-定价上架说明.md）
 └── web/                  # React + Vite 前端
     ├── src/
     │   ├── api/
-    │   ├── pages/         # 登录、任务中心、商品列表、审核台（ReviewBoard）等页面
+    │   ├── pages/         # 登录、任务中心、商品列表、审核台（ReviewBoard）、上架审核（ListingReview）、
+    │   │                  #   店铺管理（Shops）等页面
     │   └── store/
     └── nginx.conf         # 生产镜像内 nginx：SPA + /api、/ws 反代
 ```
@@ -151,9 +157,28 @@ ozon-listing-auto/
 
 详细操作流程与真实 LLM 切换步骤见 [`docs/M3-评分审核说明.md`](docs/M3-评分审核说明.md)。
 
+## M4 已实现功能（跟卖定价与挂靠上架）
+
+- **定价引擎**（`app/services/pricing.py`）：对已采用候选按货源到手价（含 `logistics` 运费）计算 Ozon 售价，支持两种模式（任务/全局参数经 `PUT /settings/pricing` 配置，`GET /settings/pricing` 脱敏读取）：
+  - `mode=builtin`（默认）：**内置毛利率反推**——`售价 = (到手价 + 运费) / (1 - 目标毛利率 - 平台佣金率 - 履约费率) × 汇率`，参数 `commission_rate`/`fulfillment_rate`/`fx`/`target_margin`/`logistics` 均可配置；分母 ≤ 0（毛利率+佣金+履约费率之和越界）时判定该价格不可用（拦截）。
+  - `mode=formula`：**simpleeval 自定义公式**，可用变量 `cost`/`logistics`/`commission_rate`/`fulfillment_rate`/`fx`/`weight`/`target_margin`/`min_price` 做纯算术运算；出于安全考虑禁用函数调用与属性/方法访问（`se.functions = {}` + 剔除 `ast.Attribute` 节点），公式非法或求值异常时安全兜底为拦截，不会抛出到调用方。
+  - **最低价保护**：算出的售价 ≤ 0 或低于配置的 `min_price` 时该候选被拦截（草稿状态 `below_min`，不参与后续确认/挂靠）。
+  - 划线价 `strike` 按 `strike_coeff`（默认 1.3）系数从售价换算，仅供参考展示。
+- **Ozon 写入抽象**（`app/services/ozon_seller/`，`OzonSellerProvider` 协议 `create_follow_offer()`）：
+  - `MockOzonSeller`（默认，`get_ozon_seller("mock")`）：确定性返回挂靠成功，`ozon_product_id` 固定为 `OZ-{offer_id}`，供本地/CI 全链路验证，无需任何外部依赖。
+  - `RealOzonSeller`（`get_ozon_seller("real")`）：以店铺 `Client-Id`/`Api-Key` 调 Ozon Seller API 创建跟卖 offer 的真实实现；**当前接口地址与请求体是占位实现（`_ENDPOINT` 指向 `product/import`），真实跟卖端点字段需在 live 联调时校正**，且目前后端代码（`POST /listing/publish` 同步路径与 `run_publish` 异步 worker）尚**硬编码使用 `mock`**，暂无环境变量/配置项可一键切到 `real`——要跑通真实挂靠需临时改动 `app/api/listing.py` / `app/workers/publisher.py` 里的 `get_ozon_seller("mock")` 为 `get_ozon_seller("real")`，详见 [`docs/M4-定价上架说明.md`](docs/M4-定价上架说明.md) 第 5 节。
+- **草稿生成**（`app/services/listing_builder.py`，`POST /listing/build`）：把某任务下已采用（`adopted`/`auto_adopted`）的候选按定价参数逐个生成 `listing_drafts` 记录（幂等，同一候选不会重复生成），写入进价 `cost`、售价 `price`、毛利率 `margin`、定价明细 `pricing_detail`；被最低价拦截的候选草稿状态为 `below_min`，其余为 `draft`。
+- **确认闸门与自动确认**（`app/workers/publisher.py`）：草稿默认需人工 `POST /listing/{id}/confirm` 确认（`draft → confirmed`）才能进入挂靠；若任务 `review_config.listing_review_required=false`，`POST /listing/auto-confirm` 会按可选阈值 `listing_score_min`（对比候选 `score_total`）批量把达标草稿从 `draft` 置为 `confirmed`。
+- **挂靠上架**（`POST /listing/publish`）：对该任务下 `confirmed` 状态的草稿逐条调用 `OzonSellerProvider.create_follow_offer()`，成功则草稿状态置为 `published` 并回写 `ozon_result.ozon_product_id`；失败（含店铺凭据解密失败等异常）则置为 `failed` 并记录 `error`，单条失败不影响同批其余草稿。`sync=true` 请求内同步跑完（当前固定用 `mock` seller，便于本地/演示/测试）；`sync=false`（默认）经 ARQ 入队由 `worker` 异步执行 `app.workers.publisher.run_publish`（当前同样固定用 `mock` seller）。
+- **店铺凭据管理**（`/shops`，admin，`app/models/shop.py`）：Ozon 店铺 `Client-Id`（明文）+ `Api-Key`（`FERNET_KEY` 加密存储）CRUD，响应统一脱敏（不回传 `api_key` 字段）；草稿关联 `shop_id` 后挂靠时按店铺解密取用凭据。
+- **上架 API**（`/listing`，`app/api/listing.py`）：`POST /listing/build`（operator 及以上）、`GET /listing/drafts`（按任务/状态过滤）、`POST /listing/{id}/confirm`（reviewer/admin）、`POST /listing/auto-confirm`（operator 及以上）、`POST /listing/publish`（publisher/admin，`sync` 参数控制同步/入队）、`GET /listing/monitor`（按状态统计草稿数量）。
+- **前端**：`ListingReview`（`/listing`）——按任务生成草稿、选店铺、草稿列表展示进价/售价/毛利率/状态/Ozon 回写结果，逐条确认或按开关批量自动确认、一键挂靠；`Shops`（`/shops`）——新增/列表/删除店铺，`Api-Key` 输入框脱敏、列表不回显凭据。
+
+详细操作流程（建店铺→配定价→build→确认→publish→切真实）见 [`docs/M4-定价上架说明.md`](docs/M4-定价上架说明.md)。
+
 ## 测试
 
-后端（64 个用例，默认跳过标记为 `live` 的真实网络冒烟测试，覆盖 M1 采集 + M2 货源匹配 + M3 评分审核全链路）：
+后端（83 个用例，默认跳过标记为 `live` 的真实网络冒烟测试，覆盖 M1 采集 + M2 货源匹配 + M3 评分审核 + M4 定价上架全链路）：
 
 ```bash
 cd server && .venv/bin/python -m pytest -q
@@ -184,7 +209,7 @@ cd web && npx vitest run
 - **M1**：采集入库（已完成）——登录鉴权、采集任务（跟卖/自建）、六维筛选、WebSocket 进度推送
 - **M2**：货源匹配（已完成）——账号池、双源（1688/拼多多）候选采集、CLIP 跨平台去重、匹配/候选 API
 - **M3**：五维评分与审核台（已完成）——五维评分引擎+tier、LLM 抽象（mock/OpenAI 兼容）、审核台（采用/拒绝/自动采用）、评分/审核 API
-- **M4**：跟卖定价与上架（待开发）
+- **M4**：跟卖定价与挂靠上架（已完成）——定价引擎（内置反推/自定义公式+最低价保护）、Ozon 写入抽象（mock/real）、草稿生成/确认闸门/自动确认、挂靠上架回写 Ozon 商品 ID、店铺凭据管理、上架 API + 前端。**注意**：M4 是确认后直接挂靠，暂无节奏/时间调度，节奏调度是 M5 的范围
 - **M5**：上架节奏调度（待开发）
 - **M6**：自建改图与类目映射（待开发）
 - **M7**：公网部署（Nginx + HTTPS）（待开发）
