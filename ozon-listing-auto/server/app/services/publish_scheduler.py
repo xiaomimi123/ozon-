@@ -39,7 +39,15 @@ async def plan_schedule(session: AsyncSession, task_id: int, pace: dict, *, now:
     if daily_limit <= 0:
         daily_limit = 10**9   # <=0 视为不限每日上限, 避免滚动死循环
     mn, mx = int(pace.get("min_interval_sec", 60)), int(pace.get("max_interval_sec", 180))
+    # 用当日已排期/已上架的草稿数作为 per_day 起点(跨多次 schedule 调用不超日限, spec §4.3)
+    existing = (await session.execute(select(ListingDraft.scheduled_at).where(
+        ListingDraft.task_id == task_id,
+        ListingDraft.status.in_(("scheduled", "pending_review", "published")),
+        ListingDraft.scheduled_at.is_not(None)))).scalars().all()
     per_day: dict = {}
+    for sat in existing:
+        if sat is not None:
+            per_day[sat.date()] = per_day.get(sat.date(), 0) + 1
     cursor = now
     n = 0
     for d in drafts:

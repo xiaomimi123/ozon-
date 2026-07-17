@@ -55,6 +55,20 @@ async def test_plan_schedule_zero_daily_limit_no_hang(db_session):
     assert r["scheduled"] == 2   # 正常排期, 不 hang
 
 @pytest.mark.asyncio
+async def test_plan_schedule_daily_limit_across_batches(db_session):
+    tid = await _seed(db_session, n=2)   # 2 confirmed drafts
+    now = datetime(2026, 7, 18, 10, 0, tzinfo=timezone.utc)
+    pace = {**DEFAULT_PACE, "daily_limit": 1, "min_interval_sec": 1, "max_interval_sec": 1, "active_hours": [0, 24]}
+    # 第一次: 1 条排到今天, 1 条应被 daily_limit=1 顶到次日
+    r1 = await plan_schedule(db_session, tid, pace, now=now, rng=random.Random(1))
+    await db_session.commit()
+    assert r1["scheduled"] == 2
+    from sqlalchemy import select as _sel
+    from app.models import ListingDraft as _LD
+    days = sorted({d.scheduled_at.date() for d in (await db_session.execute(_sel(_LD).where(_LD.task_id == tid))).scalars().all()})
+    assert len(days) == 2   # daily_limit=1 → 两条分到两天(而非同一天)
+
+@pytest.mark.asyncio
 async def test_get_pace_fallback(db_session):
     tid = await _seed(db_session, n=1)
     # 无 pace → DEFAULT
