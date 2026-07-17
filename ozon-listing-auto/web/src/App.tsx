@@ -7,6 +7,7 @@ import ReviewBoard from "./pages/ReviewBoard";
 import ListingReview from "./pages/ListingReview";
 import Shops from "./pages/Shops";
 import PricingSettings from "./pages/PricingSettings";
+import PublishMonitor from "./pages/PublishMonitor";
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
           <Route path="/listing" element={<ListingReview />} />
           <Route path="/shops" element={<Shops />} />
           <Route path="/pricing" element={<PricingSettings />} />
+          <Route path="/monitor" element={<PublishMonitor />} />
         </Route>
         <Route path="*" element={<Navigate to="/tasks" replace />} />
       </Routes>

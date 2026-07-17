@@ -17,15 +17,25 @@ from app.api.score import router as score_router
 from app.api.review import router as review_router
 from app.api.shops import router as shops_router
 from app.api.listing import router as listing_router
+from app.api.pace import router as pace_router
+from app.api.publish import router as publish_router
 
 setup_logging()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    import asyncio
+
+    from app.core.config import settings
     from app.core.db import async_session
+    from app.core.progress import broadcaster
     from app.seed import ensure_admin
     await ensure_admin(async_session)
+    if settings.progress_backend == "redis":
+        # redis 后端才需要 API 进程订阅 Redis 频道并本地 fan-out 给 WS 连接；
+        # memory 后端（默认/测试）无需订阅，行为不变。
+        asyncio.create_task(broadcaster.start_redis_subscriber())
     yield
 
 
@@ -46,6 +56,8 @@ app.include_router(score_router)
 app.include_router(review_router)
 app.include_router(shops_router)
 app.include_router(listing_router)
+app.include_router(pace_router)
+app.include_router(publish_router)
 
 @app.get("/health")
 async def health():

@@ -19,5 +19,7 @@ class Settings(BaseSettings):
     llm_model: str = "qwen-plus"
     # Ozon 跟卖挂靠：mock（默认，无需真实凭据）或 real（真实调用 Ozon Seller API，需店铺真实凭据）。
     ozon_seller_provider: str = "mock"   # mock | real; 真实挂靠需配 real + 店铺真实凭据
+    # 进度广播后端：memory（默认，单进程本地 fan-out）或 redis（跨进程 pub/sub，worker/API 分离时用）。
+    progress_backend: str = "memory"    # memory | redis
 
 settings = Settings()

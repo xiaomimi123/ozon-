@@ -8,6 +8,7 @@ from app.models.supply_candidate import SupplyCandidate, EMBED_DIM
 from app.models.review_decision import ReviewDecision
 from app.models.shop import Shop
 from app.models.listing_draft import ListingDraft
+from app.models.publish_pace import PublishPace
 
 __all__ = [
     "User",
@@ -20,4 +21,5 @@ __all__ = [
     "ReviewDecision",
     "Shop",
     "ListingDraft",
+    "PublishPace",
 ]
