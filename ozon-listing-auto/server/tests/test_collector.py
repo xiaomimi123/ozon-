@@ -80,3 +80,29 @@ async def test_run_collect_paused_stops_then_resumes(engine):
     assert task.status == "done"
     assert rows == _expected_total()
     assert task.stats["inserted"] == _expected_total()
+
+
+@pytest.mark.asyncio
+async def test_run_collect_marks_failed_on_provider_error(engine, monkeypatch):
+    """provider 连续失败时任务应标记 failed（不卡在 running），且 run_collect_core 不抛出异常（spec §4.2.6）。"""
+    sm = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+    async with sm() as s:
+        t = CollectTask(name="t", entry_type="keyword", entry_value="x", provider="mock", source_platforms=[])
+        s.add(t); await s.commit(); tid = t.id
+
+    class BoomProvider:
+        name = "mock"
+        async def search_by_keyword(self, kw, page):
+            raise RuntimeError("boom")
+        async def list_by_category(self, u, page):
+            raise RuntimeError("boom")
+        async def list_by_seller(self, sid, page):
+            raise RuntimeError("boom")
+
+    monkeypatch.setattr("app.workers.collector.get_provider", lambda name: BoomProvider())
+
+    result = await run_collect_core(sm, tid)   # 不应抛出
+    assert result["pages"] == 0
+    async with sm() as s:
+        task = (await s.execute(select(CollectTask).where(CollectTask.id == tid))).scalar_one()
+    assert task.status == "failed"

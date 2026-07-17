@@ -44,38 +44,47 @@ async def run_collect_core(session_factory: async_sessionmaker, task_id: int, *,
     while True:
         if max_pages is not None and pages_done >= max_pages:
             break
-        # 拉一页
-        if entry_type == "seller":
-            batch = await provider.list_by_seller(entry_value, page)
-        elif entry_type == "category":
-            batch = await provider.list_by_category(entry_value, page)
-        else:
-            batch = await provider.search_by_keyword(entry_value, page)
-        if not batch:
+        try:
+            # 拉一页
+            if entry_type == "seller":
+                batch = await provider.list_by_seller(entry_value, page)
+            elif entry_type == "category":
+                batch = await provider.list_by_category(entry_value, page)
+            else:
+                batch = await provider.search_by_keyword(entry_value, page)
+            if not batch:
+                async with session_factory() as s:
+                    task = (await s.execute(select(CollectTask).where(CollectTask.id == task_id))).scalar_one()
+                    task.status = "done"
+                    task.stats = {"inserted": total_inserted, "skipped": total_skipped, "pages": pages_done}
+                    await s.commit()
+                break
+            # 跨页去重：过滤本页/之前页已见的 sku/phash
+            fresh = []
+            for d in dedup(batch):
+                if d.sku in seen_sku or (d.phash and d.phash in seen_phash):
+                    continue
+                seen_sku.add(d.sku)
+                if d.phash:
+                    seen_phash.add(d.phash)
+                fresh.append(d)
+            async with session_factory() as s:
+                r = await upsert_products(s, task_id, fresh)
+                task = (await s.execute(select(CollectTask).where(CollectTask.id == task_id))).scalar_one()
+                total_inserted += r["inserted"]; total_skipped += r["skipped"]
+                task.cursor = {"page": page}
+                task.stats = {"inserted": total_inserted, "skipped": total_skipped, "pages": pages_done + 1}
+                # 若外部把状态置为 paused，则停止
+                paused = task.status == "paused"
+                await s.commit()
+        except Exception as exc:
+            # 连续失败标 failed 并留日志（spec §4.2.6）：保留已提交的 cursor/stats 以便人工排查后续跑
+            log.error("collect_failed", page=page, error=str(exc))
             async with session_factory() as s:
                 task = (await s.execute(select(CollectTask).where(CollectTask.id == task_id))).scalar_one()
-                task.status = "done"
-                task.stats = {"inserted": total_inserted, "skipped": total_skipped, "pages": pages_done}
+                task.status = "failed"
                 await s.commit()
             break
-        # 跨页去重：过滤本页/之前页已见的 sku/phash
-        fresh = []
-        for d in dedup(batch):
-            if d.sku in seen_sku or (d.phash and d.phash in seen_phash):
-                continue
-            seen_sku.add(d.sku)
-            if d.phash:
-                seen_phash.add(d.phash)
-            fresh.append(d)
-        async with session_factory() as s:
-            r = await upsert_products(s, task_id, fresh)
-            task = (await s.execute(select(CollectTask).where(CollectTask.id == task_id))).scalar_one()
-            total_inserted += r["inserted"]; total_skipped += r["skipped"]
-            task.cursor = {"page": page}
-            task.stats = {"inserted": total_inserted, "skipped": total_skipped, "pages": pages_done + 1}
-            # 若外部把状态置为 paused，则停止
-            paused = task.status == "paused"
-            await s.commit()
         pages_done += 1
         log.info("collect_page", page=page, inserted=r["inserted"], skipped=r["skipped"])
         if progress_cb:
