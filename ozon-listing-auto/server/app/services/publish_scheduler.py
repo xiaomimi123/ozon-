@@ -36,6 +36,8 @@ async def plan_schedule(session: AsyncSession, task_id: int, pace: dict, *, now:
         ListingDraft.scheduled_at.is_(None)).order_by(ListingDraft.id))).scalars().all()
     ah = list(pace.get("active_hours", [9, 23]))
     daily_limit = int(pace.get("daily_limit", 200))
+    if daily_limit <= 0:
+        daily_limit = 10**9   # <=0 视为不限每日上限, 避免滚动死循环
     mn, mx = int(pace.get("min_interval_sec", 60)), int(pace.get("max_interval_sec", 180))
     per_day: dict = {}
     cursor = now

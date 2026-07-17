@@ -45,6 +45,16 @@ async def test_plan_schedule_spaces_and_advances(db_session):
     assert times[0] > now and times == sorted(times)
 
 @pytest.mark.asyncio
+async def test_plan_schedule_zero_daily_limit_no_hang(db_session):
+    tid = await _seed(db_session, n=2)
+    now = datetime(2026, 7, 18, 10, 0, tzinfo=timezone.utc)
+    rng = random.Random(1)
+    pace = {**DEFAULT_PACE, "daily_limit": 0}   # 0 不应死循环
+    r = await plan_schedule(db_session, tid, pace, now=now, rng=rng)
+    await db_session.commit()
+    assert r["scheduled"] == 2   # 正常排期, 不 hang
+
+@pytest.mark.asyncio
 async def test_get_pace_fallback(db_session):
     tid = await _seed(db_session, n=1)
     # 无 pace → DEFAULT
