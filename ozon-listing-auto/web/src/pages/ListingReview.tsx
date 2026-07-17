@@ -20,7 +20,11 @@ export default function ListingReview() {
   useEffect(() => { getCategories().then(setCategories).catch(() => {}); }, []);
   const load = async () => { if (!taskId) { message.warning("请先输入任务ID"); return; } setRows(await getDrafts(taskId)); };
   const onBuild = async () => { if (!taskId) return; const r = await buildDrafts(taskId, shopId); message.success(`生成 ${r.built} 条(拦截 ${r.blocked})`); load(); };
-  const onConfirm = async (id: number) => { await confirmDraft(id); message.success("已确认"); load(); };
+  const onConfirm = async (id: number) => {
+    const res = await confirmDraft(id);
+    if (res?.error) { message.warning(res.error); } else { message.success("已确认"); }
+    load();
+  };
   const onAuto = async () => { if (!taskId) return; const r = await autoConfirm(taskId); message.success(`自动确认 ${r.confirmed} 条`); load(); };
   const onPublish = async () => { if (!taskId) return; const r = await publishDrafts(taskId); message.success(`挂靠 ${r.published} 条(失败 ${r.failed})`); load(); };
 
