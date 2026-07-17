@@ -1,0 +1,23 @@
+{
+  "ali1688": [
+    {"offer_id": "AL-1", "title": "无线耳机", "price": 12.5, "currency": "CNY", "quantity_begin": 2,
+     "quantity_prices": [{"qty": 2, "price": 12.5}, {"qty": 100, "price": 9.9}],
+     "image_url": "https://img/earbuds_black.jpg", "detail_url": "https://1688/AL-1",
+     "supplier_name": "深圳某电子厂",
+     "supplier_info": {"repurchase_rate": 0.45, "credit_level": "AAA", "credit_text": "信用AAA",
+        "reg_capital": "500万", "province": "广东", "city": "深圳",
+        "position_labels": ["深度验厂", "7×24H响应"], "scores": {"综合": 4.8, "物流": 4.7, "退货": 4.9}, "gmv_price": 100000}},
+    {"offer_id": "AL-2", "title": "机械键盘", "price": 45.0, "currency": "CNY", "quantity_begin": 1,
+     "image_url": "https://img/keyboard.jpg", "detail_url": "https://1688/AL-2",
+     "supplier_name": "东莞某厂", "supplier_info": {"repurchase_rate": 0.30, "credit_level": "AA", "province": "广东"}}
+  ],
+  "pinduoduo": [
+    {"offer_id": "PDD-1", "title": "无线耳机 蓝牙", "price": 13.9, "currency": "CNY",
+     "image_url": "https://img/earbuds_black.jpg", "detail_url": "https://pdd/PDD-1",
+     "supplier_name": "拼多多店A", "supplier_info": {"scores": {"综合": 4.6}, "province": "浙江"}},
+    {"offer_id": "PDD-2", "title": "手机支架", "price": 6.5, "currency": "CNY",
+     "image_url": "https://img/phone_stand.jpg", "detail_url": "https://pdd/PDD-2",
+     "supplier_name": "拼多多店B", "supplier_info": {"scores": {"综合": 4.3}}}
+  ],
+  "mock": [{"offer_id": "M1", "title": "示例", "price": 9.9, "image_url": "https://img/m.jpg"}]
+}

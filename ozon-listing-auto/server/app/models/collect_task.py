@@ -25,6 +25,9 @@ class CollectTask(Base):
     status: Mapped[str] = mapped_column(String(16), default="pending")        # pending/running/paused/done/failed
     cursor: Mapped[dict | None] = mapped_column(_JSONB, nullable=True)
     stats: Mapped[dict | None] = mapped_column(_JSONB, nullable=True)
+    match_status: Mapped[str] = mapped_column(String(16), default="pending")   # pending/running/paused/done/failed
+    match_cursor: Mapped[dict | None] = mapped_column(_JSONB, nullable=True)
+    match_stats: Mapped[dict | None] = mapped_column(_JSONB, nullable=True)
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
