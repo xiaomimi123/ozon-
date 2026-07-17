@@ -24,3 +24,20 @@ async def test_review_queue_and_decide(client, db_session):
     assert r.status_code == 200 and r.json()["status"] == "adopted"
     rd = (await db_session.execute(select(ReviewDecision).where(ReviewDecision.candidate_id == cid))).scalar_one()
     assert rd.decision == "adopt"
+
+@pytest.mark.asyncio
+async def test_auto_adopt_missing_task_404(client, db_session):
+    # auto-adopt requires the "operator" role (reviewer would 403 before reaching
+    # the 404 check), so seed a dedicated operator user for this test.
+    db_session.add(User(username="op", password_hash=hash_password("p"), role="operator"))
+    await db_session.commit()
+    tok = (await client.post("/auth/login", data={"username": "op", "password": "p"})).json()["access_token"]
+    h = {"Authorization": f"Bearer {tok}"}
+    r = await client.post("/review/auto-adopt?task_id=999999", headers=h)
+    assert r.status_code == 404
+
+@pytest.mark.asyncio
+async def test_decide_missing_candidate_404(client, db_session):
+    tid, cid, h = await _seed_login(client, db_session)
+    r = await client.post("/review/999999", json={"decision": "adopt"}, headers=h)
+    assert r.status_code == 404
