@@ -60,3 +60,11 @@ async def test_publish_bad_credential_isolated(engine):
         d = (await s.execute(select(ListingDraft).where(ListingDraft.id == did))).scalar_one()
     assert result["failed"] == 1 and result["published"] == 0
     assert d.status == "failed" and d.error
+
+def test_ozon_seller_config_default_mock():
+    from app.core.config import settings
+    from app.services.ozon_seller.factory import get_ozon_seller
+    # 默认配置解析为 mock; 工厂能按配置名构造(real 分支惰性可用)
+    assert settings.ozon_seller_provider == "mock"
+    assert get_ozon_seller(settings.ozon_seller_provider).name == "mock"
+    assert get_ozon_seller("real").name == "real"

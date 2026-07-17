@@ -67,4 +67,5 @@ async def run_publish_core(session_factory: async_sessionmaker, task_id: int, *,
 
 async def run_publish(ctx, task_id: int) -> dict:
     from app.core.db import async_session
-    return await run_publish_core(async_session, task_id, seller=get_ozon_seller("mock"))
+    from app.core.config import settings
+    return await run_publish_core(async_session, task_id, seller=get_ozon_seller(settings.ozon_seller_provider))
