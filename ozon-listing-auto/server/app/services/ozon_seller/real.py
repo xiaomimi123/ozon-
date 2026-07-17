@@ -21,3 +21,17 @@ class RealOzonSeller:
                                  status="pending_review", raw=data)
         except Exception as exc:  # noqa: BLE001
             return PublishResult(ok=False, ozon_product_id=None, status="failed", error=str(exc))
+
+    async def get_product_status(self, *, client_id, api_key, ozon_product_id) -> str:
+        import httpx
+        headers = {"Client-Id": client_id, "Api-Key": api_key, "Content-Type": "application/json"}
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout) as c:
+                r = await c.post("https://api-seller.ozon.ru/v2/product/info", headers=headers,
+                                 json={"product_id": ozon_product_id})   # 占位, 联调校正
+                r.raise_for_status()
+                data = r.json()
+            # 依 Ozon 返回映射 → approved|pending|rejected; 占位默认 pending
+            return "pending"
+        except Exception:  # noqa: BLE001
+            return "pending"
