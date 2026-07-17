@@ -1,6 +1,6 @@
-# Ozon 跟卖/铺货自动化系统（M1 + M2）
+# Ozon 跟卖/铺货自动化系统（M1 + M2 + M3）
 
-面向 Ozon 平台跟卖/铺货场景的自动化辅助系统。M1 完成骨架搭建：登录鉴权、采集任务管理（跟卖/自建两种模式、mock/composer/apify 三种数据源）、商品入库去重、六维条件筛选浏览、WebSocket 采集进度推送，以及 Docker Compose 一键启动。M2 在此基础上新增货源匹配：账号池、双源（1688/拼多多）候选采集、跨平台 CLIP 去重、匹配/候选管理 API。
+面向 Ozon 平台跟卖/铺货场景的自动化辅助系统。M1 完成骨架搭建：登录鉴权、采集任务管理（跟卖/自建两种模式、mock/composer/apify 三种数据源）、商品入库去重、六维条件筛选浏览、WebSocket 采集进度推送，以及 Docker Compose 一键启动。M2 在此基础上新增货源匹配：账号池、双源（1688/拼多多）候选采集、跨平台 CLIP 去重、匹配/候选管理 API。M3 在匹配候选之上新增五维评分与审核台：图像/标题/属性/价格/供应商五维打分 + tier 分级、LLM 抽象（mock/OpenAI 兼容，用于译标题与抽属性）、人工审核（采用/拒绝）或按阈值自动采用、评分/审核 API + 审核台前端。
 
 ## 技术栈
 
@@ -68,6 +68,10 @@ npm run build    # 生产构建
 | `ADMIN_PASSWORD` | 启动种子创建的首个管理员密码 | `admin123` |
 | `EMBEDDER` | 货源匹配用的图像 embedder：`mock`（无需 torch）或 `clip`（真实 `ChineseClipEmbedder`） | `mock` |
 | `INSTALL_ML` | worker 镜像构建参数，是否安装 `[ml]`（torch/cn_clip，体积达数 GB）；仅 `EMBEDDER=clip` 时需要设为 `true` | `false` |
+| `LLM_PROVIDER` | 五维评分用的 LLM 服务：`mock`（确定性桩，无需 key）或 `openai`（OpenAI 兼容 Chat Completions） | `mock` |
+| `LLM_BASE_URL` | `LLM_PROVIDER=openai` 时的接口地址 | `https://dashscope.aliyuncs.com/compatible-mode/v1`（通义千问 DashScope） |
+| `LLM_API_KEY` | `LLM_PROVIDER=openai` 时的 API key | 空 |
+| `LLM_MODEL` | `LLM_PROVIDER=openai` 时使用的模型名 | `qwen-plus` |
 
 生成生产用 `FERNET_KEY`：
 
@@ -83,20 +87,22 @@ ozon-listing-auto/
 ├── .env.example
 ├── server/               # FastAPI 后端
 │   ├── app/
-│   │   ├── api/          # 路由（auth/tasks/collect/products/settings/ws/accounts/match/candidates）
+│   │   ├── api/          # 路由（auth/tasks/collect/products/settings/ws/accounts/match/candidates/score/review）
 │   │   ├── core/         # 配置、数据库、鉴权、加密等基础设施
-│   │   ├── models/       # SQLAlchemy ORM 模型（含 source_account/supply_candidate）
+│   │   ├── models/       # SQLAlchemy ORM 模型（含 source_account/supply_candidate/review_decision）
 │   │   ├── services/     # 业务逻辑：六维筛选、入库去重、ozon_market 采集 provider、
-│   │   │                 #   sources/（1688/拼多多货源 provider）、embedding/（mock/CLIP）、账号池、候选去重入库
-│   │   ├── workers/      # ARQ 后台任务（采集 collector、货源匹配 matcher，均支持断点续传/暂停）
+│   │   │                 #   sources/（1688/拼多多货源 provider）、embedding/（mock/CLIP）、账号池、候选去重入库、
+│   │   │                 #   scoring.py（五维评分引擎+tier）、review.py（审核队列/采用拒绝/自动采用/并发锁）、
+│   │   │                 #   llm/（mock/OpenAI 兼容 LLM 抽象，译标题+抽属性）
+│   │   ├── workers/      # ARQ 后台任务（采集 collector、货源匹配 matcher、评分 scorer，均支持断点续传/暂停）
 │   │   └── seed.py       # 启动种子：幂等创建首个管理员
 │   ├── alembic/          # 数据库迁移
 │   └── tests/
-├── docs/                 # 里程碑设计文档（如 M2-货源匹配说明.md）
+├── docs/                 # 里程碑设计文档（如 M2-货源匹配说明.md、M3-评分审核说明.md）
 └── web/                  # React + Vite 前端
     ├── src/
     │   ├── api/
-    │   ├── pages/         # 登录、任务中心、商品列表等页面
+    │   ├── pages/         # 登录、任务中心、商品列表、审核台（ReviewBoard）等页面
     │   └── store/
     └── nginx.conf         # 生产镜像内 nginx：SPA + /api、/ws 反代
 ```
@@ -124,9 +130,30 @@ ozon-listing-auto/
 - **匹配控制 API**（`/match`，operator 及以上）：`POST /match/start`（`sync=true` 同步跑完便于本地/mock 演示，`sync=false` 经 ARQ 入队异步执行）、`POST /match/pause`、`GET /match/monitor`（匹配状态 `match_status` + 统计 `match_stats`），支持断点续传（游标记录到已处理商品）
 - **候选查询 API**（`/candidates`）：按任务/商品/平台过滤、`only_representative` 只看去重代表、分页返回，字段含 `platform`/`offer_id`/价格/起订量/供应商信息/`is_representative`/去重分组
 
+## M3 已实现功能（五维评分与审核台）
+
+- **五维评分引擎**（`app/services/scoring.py`）：候选商品按 **图像 45% / 标题 20% / 属性 15% / 价格 5% / 供应商 15%** 加权算出总分（权重可通过 `weights` 参数覆盖）：
+  - 图像分：Ozon 主图向量与候选图向量的余弦相似度（复用 M2 的 `embedding`/`EMBEDDER` 配置，`mock`/`clip` 通用）
+  - 标题分：Ozon 标题经 LLM 译中后与候选标题的相似度
+  - 属性分：LLM 从候选标题抽取结构化属性 JSON，与 Ozon 属性做键值命中率
+  - 价格分：命中价格区间给满分，否则按有价/无价给基础分
+  - 供应商分：综合供应商复购率、信用等级（1688 `supplier_info`）等信号
+  - 总分按可配阈值（默认 `tier_auto=85` / `tier_review=70`）分级为 `auto`（免审自动采用）/ `review`（需人工审核）/ `rejected`
+- **LLM 抽象**（`app/services/llm/`，`LLMProvider` 协议：`chat`/`translate`/`extract_json`）：
+  - `MockLLM`（默认）：确定性桩，`translate` 恒等透传、`extract_json` 返回空，无需 key/网络，用于开发/CI
+  - `OpenAICompatLLM`：真实 OpenAI 兼容 Chat Completions 客户端（Bearer 鉴权、失败重试 3 次、容错解析模型返回的 JSON），默认对接**通义千问 DashScope**，也可指向任意 OpenAI 兼容服务；由 `LLM_PROVIDER=openai` + `LLM_BASE_URL`/`LLM_API_KEY`/`LLM_MODEL` 环境变量启用
+- **审核台**（`app/services/review.py` + `/review` API + 前端 `ReviewBoard`）：
+  - 审核队列 `GET /review/queue`：按任务聚合「一个 Ozon 商品 ↔ 其下多个候选（按总分降序）」，前端左侧展示 Ozon 商品图/标题/价格，右侧逐个展示候选的平台标签、五维分明细、总分与 tier
+  - 决策 `POST /review/{candidate_id}`（`decision=adopt|reject`，写 `review_decisions` 留痕）：对同一商品下的多个候选逐一「采用」或「拒绝」，即可实现换选另一候选
+  - 任务级 `review_config`（`source_review_required` 是否需要人工审核、`source_score_min` 自动采用分数线）：关闭审核开关后调用 `POST /review/auto-adopt` 按阈值批量自动采用达标候选（同样写 `review_decisions`，`decision=auto_adopt`，`reviewer_id=null` 留痕），前端关闭审核走二次确认弹窗
+  - 多人审核并发锁：`review_lock()` 预留了按商品加锁的接口（当前实现为 no-op 上下文管理器），生产环境替换为 Redis 分布式锁即可避免多个审核员对同一商品重复决策
+- **评分控制 API**（`/score`，operator 及以上）：`POST /score/start`（`sync=true` 同步跑完，便于本地/mock 演示；`sync=false` 经 ARQ 入队由 `worker` 异步执行 `app.workers.scorer.run_score`）、`POST /score/pause`、`GET /score/monitor`（`score_status` + `score_stats`），支持断点续传（`score_cursor` 记录到已处理的最后一个商品 id）
+
+详细操作流程与真实 LLM 切换步骤见 [`docs/M3-评分审核说明.md`](docs/M3-评分审核说明.md)。
+
 ## 测试
 
-后端（50 个用例，默认跳过标记为 `live` 的真实网络冒烟测试，覆盖 M1 采集 + M2 货源匹配全链路）：
+后端（64 个用例，默认跳过标记为 `live` 的真实网络冒烟测试，覆盖 M1 采集 + M2 货源匹配 + M3 评分审核全链路）：
 
 ```bash
 cd server && .venv/bin/python -m pytest -q
@@ -156,7 +183,7 @@ cd web && npx vitest run
 
 - **M1**：采集入库（已完成）——登录鉴权、采集任务（跟卖/自建）、六维筛选、WebSocket 进度推送
 - **M2**：货源匹配（已完成）——账号池、双源（1688/拼多多）候选采集、CLIP 跨平台去重、匹配/候选 API
-- **M3**：五维评分与审核台（待开发）
+- **M3**：五维评分与审核台（已完成）——五维评分引擎+tier、LLM 抽象（mock/OpenAI 兼容）、审核台（采用/拒绝/自动采用）、评分/审核 API
 - **M4**：跟卖定价与上架（待开发）
 - **M5**：上架节奏调度（待开发）
 - **M6**：自建改图与类目映射（待开发）

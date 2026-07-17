@@ -3,6 +3,7 @@ import Login from "./pages/Login";
 import Layout from "./pages/Layout";
 import Tasks from "./pages/Tasks";
 import Products from "./pages/Products";
+import ReviewBoard from "./pages/ReviewBoard";
 
 export default function App() {
   return (
@@ -12,6 +13,7 @@ export default function App() {
         <Route element={<Layout />}>
           <Route path="/tasks" element={<Tasks />} />
           <Route path="/products" element={<Products />} />
+          <Route path="/review" element={<ReviewBoard />} />
         </Route>
         <Route path="*" element={<Navigate to="/tasks" replace />} />
       </Routes>
