@@ -1,5 +1,5 @@
 """类目 API(§5.7)：类目树 / LLM 建议(记忆复用) / 确认写记忆表。"""
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import get_session
@@ -21,7 +21,9 @@ async def categories(parent_id: int | None = None, _: User = Depends(require_rol
 @router.post("/category/suggest", response_model=SuggestOut)
 async def suggest(candidate_id: int, s: AsyncSession = Depends(get_session),
                   _: User = Depends(require_role("operator"))):
-    c = (await s.execute(select(SupplyCandidate).where(SupplyCandidate.id == candidate_id))).scalar_one()
+    c = (await s.execute(select(SupplyCandidate).where(SupplyCandidate.id == candidate_id))).scalar_one_or_none()
+    if not c:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "候选不存在")
     res = await suggest_category(s, c, llm=get_llm("mock"), tree=get_category_tree("mock"))
     await s.commit()   # memory 命中会 +usage_count
     return SuggestOut(**res)

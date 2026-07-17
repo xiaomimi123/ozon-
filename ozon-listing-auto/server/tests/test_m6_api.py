@@ -18,8 +18,16 @@ async def _seed_adopted_create(client, db_session):
     return t.id, c.id, {"Authorization": f"Bearer {tok}"}
 
 
+def _png_bytes() -> bytes:
+    import io
+    from PIL import Image
+    b = io.BytesIO(); Image.new("RGBA", (60, 40), (10, 20, 30, 255)).save(b, format="PNG"); return b.getvalue()
+
+
 @pytest.mark.asyncio
-async def test_images_process_then_approve(client, db_session):
+async def test_images_process_then_approve(client, db_session, monkeypatch):
+    import app.workers.imager as imager_mod
+    monkeypatch.setattr(imager_mod, "_default_fetch", lambda url: _png_bytes())
     tid, cid, h = await _seed_adopted_create(client, db_session)
     r = await client.post(f"/images/process?task_id={tid}&sync=true", headers=h)
     assert r.status_code == 200 and r.json()["processed"] >= 1
