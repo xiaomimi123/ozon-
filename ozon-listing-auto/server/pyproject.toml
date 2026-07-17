@@ -29,6 +29,11 @@ dev = ["pytest>=8.2", "pytest-asyncio>=0.23", "aiosqlite>=0.20"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = ["live: 需真实网络访问 Ozon 的冒烟测试(默认不跑)"]
+addopts = "-m 'not live'"
+filterwarnings = [
+  "ignore:'crypt' is deprecated and slated for removal.*:DeprecationWarning",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]

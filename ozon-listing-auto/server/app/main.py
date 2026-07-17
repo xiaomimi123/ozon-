@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -11,7 +13,16 @@ from app.api.products import router as products_router
 
 setup_logging()
 
-app = FastAPI(title="Ozon 跟卖/铺货自动化系统", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    from app.core.db import async_session
+    from app.seed import ensure_admin
+    await ensure_admin(async_session)
+    yield
+
+
+app = FastAPI(title="Ozon 跟卖/铺货自动化系统", version="0.1.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
 )
@@ -25,9 +36,3 @@ app.include_router(products_router)
 @app.get("/health")
 async def health():
     return {"status": "ok"}
-
-@app.on_event("startup")
-async def _startup():
-    from app.core.db import async_session
-    from app.seed import ensure_admin
-    await ensure_admin(async_session)
