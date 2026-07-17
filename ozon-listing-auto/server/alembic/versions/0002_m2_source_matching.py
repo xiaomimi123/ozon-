@@ -14,16 +14,16 @@ def upgrade():
         sa.Column("platform", sa.String(16), nullable=False, index=True),
         sa.Column("label", sa.String(128)),
         sa.Column("credentials_encrypted", sa.LargeBinary, nullable=False),
-        sa.Column("status", sa.String(16), server_default="active"),
+        sa.Column("status", sa.String(16), server_default="active", nullable=False),
         sa.Column("last_used_at", sa.DateTime(timezone=True)),
         sa.Column("daily_used_date", sa.Date),
-        sa.Column("daily_used_count", sa.Integer, server_default="0"),
-        sa.Column("daily_limit", sa.Integer, server_default="200"),
-        sa.Column("min_interval_sec", sa.Integer, server_default="6"),
+        sa.Column("daily_used_count", sa.Integer, server_default="0", nullable=False),
+        sa.Column("daily_limit", sa.Integer, server_default="200", nullable=False),
+        sa.Column("min_interval_sec", sa.Integer, server_default="6", nullable=False),
         sa.Column("cooldown_until", sa.DateTime(timezone=True)),
-        sa.Column("risk_hits", sa.Integer, server_default="0"),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
+        sa.Column("risk_hits", sa.Integer, server_default="0", nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
     )
     op.create_table("supply_candidates",
         sa.Column("id", sa.Integer, primary_key=True),
@@ -37,16 +37,16 @@ def upgrade():
         sa.Column("phash", sa.String(64)), sa.Column("embedding", Vector(512)),
         sa.Column("detail_url", sa.String(512)), sa.Column("supplier_name", sa.String(256)),
         sa.Column("supplier_info", postgresql.JSONB),
-        sa.Column("dedup_group", sa.Integer), sa.Column("is_representative", sa.Boolean, server_default=sa.true()),
+        sa.Column("dedup_group", sa.Integer), sa.Column("is_representative", sa.Boolean, server_default=sa.true(), nullable=False),
         sa.Column("source_account_id", sa.Integer, sa.ForeignKey("source_accounts.id")),
-        sa.Column("status", sa.String(16), server_default="candidate"),
+        sa.Column("status", sa.String(16), server_default="candidate", nullable=False),
         sa.Column("raw", postgresql.JSONB),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.UniqueConstraint("task_id", "ozon_product_id", "platform", "offer_id", name="uq_candidate"),
     )
     op.create_index("ix_candidate_product", "supply_candidates", ["task_id", "ozon_product_id"])
     op.create_index("ix_candidate_product_platform", "supply_candidates", ["ozon_product_id", "platform"])
-    op.add_column("collect_tasks", sa.Column("match_status", sa.String(16), server_default="pending"))
+    op.add_column("collect_tasks", sa.Column("match_status", sa.String(16), server_default="pending", nullable=False))
     op.add_column("collect_tasks", sa.Column("match_cursor", postgresql.JSONB))
     op.add_column("collect_tasks", sa.Column("match_stats", postgresql.JSONB))
 
