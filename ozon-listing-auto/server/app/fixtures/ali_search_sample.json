@@ -1,0 +1,7 @@
+{"data": {"offerList": [
+  {"offerId": 1001, "subject": "无线耳机", "priceInfo": {"price": "12.50"}, "quantityBegin": 2,
+   "company": {"name": "深圳某厂", "creditLevel": "AAA", "regCapital": "500万", "province": "广东", "city": "深圳",
+      "repurchaseRate": "45.45%", "positionLabels": ["深度验厂"], "scores": {"comprehensive": 4.8}},
+   "detailUrl": "https://1688/1001", "imageUrl": "https://img/e.jpg"},
+  {"offerId": 1002, "subject": "键盘", "priceInfo": {"price": "45.00"}, "detailUrl": "https://1688/1002", "imageUrl": "https://img/k.jpg"}
+]}}
