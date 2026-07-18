@@ -34,7 +34,8 @@ async def listing_build(task_id: int, shop_id: int | None = None, s: AsyncSessio
     params = await _pricing_params(s)
     if t.listing_mode == "create":
         from app.services.listing_builder import build_create_drafts
-        r = await build_create_drafts(s, task_id, params=params, shop_id=shop_id)
+        from app.services.llm.config import get_configured_llm
+        r = await build_create_drafts(s, task_id, params=params, shop_id=shop_id, llm=await get_configured_llm(s))
     else:
         r = await build_follow_drafts(s, task_id, params=params, shop_id=shop_id)
     await s.commit()

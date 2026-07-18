@@ -100,7 +100,8 @@ async def run_score(ctx, task_id: int) -> dict:
     from app.core.db import async_session
     from app.core.config import settings
     from app.services.embedding.factory import get_embedder
-    from app.services.llm.factory import get_llm
+    from app.services.llm.config import get_configured_llm
+    async with async_session() as s:
+        llm = await get_configured_llm(s)
     return await run_score_core(async_session, task_id,
-                                embedder=get_embedder(settings.embedder),
-                                llm=get_llm(settings.llm_provider))
+                                embedder=get_embedder(settings.embedder), llm=llm)

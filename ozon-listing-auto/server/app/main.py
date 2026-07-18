@@ -11,6 +11,7 @@ from app.api.auth import router as auth_router
 from app.api.imagegen import router as imagegen_router
 from app.api.crawler import router as crawler_router
 from app.api.system import router as system_router
+from app.api.llm import router as llm_router
 from app.api.settings import router as settings_router
 from app.api.tasks import router as tasks_router
 from app.api.collect import router as collect_router
@@ -59,6 +60,7 @@ app.include_router(auth_router)
 app.include_router(imagegen_router)
 app.include_router(crawler_router)
 app.include_router(system_router)
+app.include_router(llm_router)
 app.include_router(settings_router)
 app.include_router(tasks_router)
 app.include_router(collect_router)
