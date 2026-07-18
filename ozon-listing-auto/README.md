@@ -334,6 +334,18 @@ OZON_COOKIE='<浏览器复制的 Cookie 值>' .venv/bin/python -m pytest tests/t
 
 未设 `OZON_COOKIE` 时用例自动 `skip`；对 `parent_id=15500`（Электроника，真实一级类目）请求子类目，断言返回非空列表且每个节点含 `id`/`name`/`path`/`leaf`。
 
+## 真实 CLIP 说明
+
+`.env` 同时设置 `INSTALL_ML=true` + `EMBEDDER=clip` 后 `docker compose up -d --build worker` 重建镜像，货源匹配（M2）的跨平台去重即从 mock 向量切到真实中文 CLIP（`cn_clip` ViT-B/16，CPU 推理）；详细步骤、资源占用、验证方式见 [`docs/真实CLIP启用说明.md`](docs/真实CLIP启用说明.md)。
+
+`@live` 真实 CLIP 向量冒烟测试（默认跳过，不影响日常回归；需先装 `[ml]`）：
+
+```bash
+cd server
+.venv/bin/pip install -e '.[ml]'
+.venv/bin/python -m pytest tests/test_live_clip.py -m live -v
+```
+
 ## 后续里程碑（概览）
 
 - **M1**：采集入库（已完成）——登录鉴权、采集任务（跟卖/自建）、六维筛选、WebSocket 进度推送
