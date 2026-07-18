@@ -10,6 +10,8 @@ import PricingSettings from "./pages/PricingSettings";
 import PublishMonitor from "./pages/PublishMonitor";
 import ImageStudio from "./pages/ImageStudio";
 import ImagegenSettings from "./pages/settings/ImagegenSettings";
+import CrawlerSettings from "./pages/settings/CrawlerSettings";
+import SystemSettings from "./pages/settings/SystemSettings";
 
 export default function App() {
   return (
@@ -26,6 +28,8 @@ export default function App() {
           <Route path="/monitor" element={<PublishMonitor />} />
           <Route path="/image-studio" element={<ImageStudio />} />
           <Route path="/settings/imagegen" element={<ImagegenSettings />} />
+          <Route path="/settings/crawler" element={<CrawlerSettings />} />
+          <Route path="/settings/system" element={<SystemSettings />} />
         </Route>
         <Route path="*" element={<Navigate to="/tasks" replace />} />
       </Routes>

@@ -6,6 +6,7 @@ from app.workers.collector import run_collect_core
 from app.models import CollectTask, OzonProduct
 from app.services.ingest import dedup
 from app.services.ozon_market.mock import OzonMockProvider
+from app.services.ozon_market.composer import CrawlerBlockedError
 
 
 def _expected_total():
@@ -99,10 +100,38 @@ async def test_run_collect_marks_failed_on_provider_error(engine, monkeypatch):
         async def list_by_seller(self, sid, page):
             raise RuntimeError("boom")
 
-    monkeypatch.setattr("app.workers.collector.get_provider", lambda name: BoomProvider())
+    monkeypatch.setattr("app.services.ozon_market.factory.get_provider", lambda name: BoomProvider())
 
     result = await run_collect_core(sm, tid)   # 不应抛出
     assert result["pages"] == 0
     async with sm() as s:
         task = (await s.execute(select(CollectTask).where(CollectTask.id == tid))).scalar_one()
     assert task.status == "failed"
+
+
+@pytest.mark.asyncio
+async def test_run_collect_marks_failed_on_crawler_blocked(engine, monkeypatch):
+    """provider 抛 CrawlerBlockedError（反爬拦截）时任务应标记 failed 并把可操作提示写入 stats.error（不是静默失败）。"""
+    sm = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+    async with sm() as s:
+        t = CollectTask(name="t", entry_type="keyword", entry_value="x", provider="mock", source_platforms=[])
+        s.add(t); await s.commit(); tid = t.id
+
+    class BlockedProvider:
+        name = "mock"
+        async def search_by_keyword(self, kw, page):
+            raise CrawlerBlockedError("疑似反爬/cookie 失效")
+        async def list_by_category(self, u, page):
+            raise CrawlerBlockedError("疑似反爬/cookie 失效")
+        async def list_by_seller(self, sid, page):
+            raise CrawlerBlockedError("疑似反爬/cookie 失效")
+
+    monkeypatch.setattr("app.services.ozon_market.factory.get_provider", lambda name: BlockedProvider())
+
+    result = await run_collect_core(sm, tid)   # 不应抛出
+    assert result["pages"] == 0
+    assert "疑似反爬" in result["error"]
+    async with sm() as s:
+        task = (await s.execute(select(CollectTask).where(CollectTask.id == tid))).scalar_one()
+    assert task.status == "failed"
+    assert "疑似反爬" in task.stats["error"]
