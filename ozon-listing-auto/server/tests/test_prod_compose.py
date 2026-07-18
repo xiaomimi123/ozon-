@@ -25,3 +25,12 @@ def test_prod_deploy_files_exist():
     assert "listen 443 ssl" in conf and "Strict-Transport-Security" in conf
     assert "/api/" in conf and "/ws/" in conf and "Upgrade" in conf
     assert "301 https" in conf                        # 80→443 强制跳转
+
+
+def test_certbot_init_uses_standalone_bootstrap_not_nginx_first():
+    # 回归测试：首次签证必须用 certbot --standalone（不依赖 nginx 已启动），
+    # 避免「nginx 需证书才能启动、证书又需 nginx 服务挑战」的 bootstrap 死锁。
+    script = (_ROOT / "deploy" / "certbot-init.sh").read_text()
+    assert "certonly" in script
+    assert "--standalone" in script
+    assert "up -d nginx" not in script                 # 不应在签证前先起 nginx
