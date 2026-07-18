@@ -75,6 +75,10 @@ npm run build    # 生产构建
 | `OZON_SELLER_PROVIDER` | Ozon 跟卖挂靠：`mock`（默认，无需真实凭据）或 `real`（真实调用 Ozon Seller API，需店铺真实凭据）。仅影响**异步/worker 路径**（`run_publish`、`run_publish_tick` 及其 cron），`sync=true` 的同步路径当前仍固定用 `mock`，见 M4/M5 章节说明 | `mock` |
 | `PROGRESS_BACKEND` | WS 进度广播后端：`memory`（默认，单进程本地 fan-out）或 `redis`（Redis pub/sub 跨进程广播，`worker`/`api` 分属不同进程时需要，例如生产环境 cron tick 的进度要推给 API 进程持有的 WS 连接） | `memory` |
 | `IMAGE_PROVIDER` | 自建改图（M6）的 `gen`（AI 生图）op 用哪个 provider：`mock`（占位，返回确定性假 URL）/`local`（Pillow 本地处理，当前未接 AI 生图，选中等价于占位）/`openai_compat`/`http`（外部 AI 生图适配器，均为 `NotImplementedError` 占位，live 后置）。**`rmbg`/`whitebg`/`watermark`/`crop_norm` 四个本地类 op 恒走 Pillow `LocalProvider`，不受此变量影响**；改图默认流水线（`POST /images/process`）只跑 `whitebg`+`crop_norm`，不含 `rmbg`/`gen`。`rmbg` 去背景需 `rembg`（属 `[ml]` 组，随 `INSTALL_ML=true` 一起装），未安装时自动降级为白底（`meta.degraded=true`），不会报错中断 | `mock` |
+| `CORS_ORIGINS`（M7）| 允许跨域访问后端 API 的来源白名单（JSON 数组字符串，如 `["https://your-domain.com"]`）；生产环境务必收紧为实际前端域名，`allow_credentials` 恒为 `false` | `["*"]` |
+| `LOGIN_MAX_ATTEMPTS`（M7）| 登录失败限流：滑动窗口 `LOGIN_WINDOW_SEC` 内失败达此次数则锁定 `LOGIN_LOCKOUT_SEC` 秒（按 `用户名\|IP` 维度计数，`/auth/login` 锁定期间返回 `429` + `Retry-After`） | `5` |
+| `LOGIN_WINDOW_SEC`（M7）| 登录失败计数的滑动窗口（秒） | `300` |
+| `LOGIN_LOCKOUT_SEC`（M7）| 登录触发限流后的锁定时长（秒） | `900` |
 
 生成生产用 `FERNET_KEY`：
 
