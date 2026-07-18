@@ -19,11 +19,11 @@ async def composer_fetch(endpoint: str, params: dict, *, cookie=None, proxy: str
                          timeout: float = 20.0, min_delay: float = 0.3, max_delay: float = 1.0,
                          max_retries: int = 4, transport=None) -> dict:
     await asyncio.sleep(random.uniform(min_delay, max_delay))
-    headers = {"User-Agent": random.choice(_UA_POOL), "Accept": "application/json"}
-    if isinstance(cookie, str) and cookie:
-        headers["Cookie"] = cookie
     backoff = 1.0
     for _ in range(max(1, int(max_retries))):
+        headers = {"User-Agent": random.choice(_UA_POOL), "Accept": "application/json"}
+        if isinstance(cookie, str) and cookie:
+            headers["Cookie"] = cookie
         kw = {"timeout": timeout, "follow_redirects": False}
         if transport is not None:
             kw["transport"] = transport
