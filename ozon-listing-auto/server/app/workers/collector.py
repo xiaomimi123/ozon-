@@ -6,7 +6,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from app.core.logging import get_logger
-from app.services.ozon_market.factory import get_provider
+from app.services.ozon_market.factory import build_ozon_provider
+from app.services.ozon_market.composer import CrawlerBlockedError
 from app.services.ingest import dedup, upsert_products
 from app.models import CollectTask
 
@@ -17,7 +18,7 @@ async def run_collect_core(session_factory: async_sessionmaker, task_id: int, *,
     log = get_logger(task_id=task_id)
     async with session_factory() as s:
         task = (await s.execute(select(CollectTask).where(CollectTask.id == task_id))).scalar_one()
-        provider = get_provider(task.provider)
+        provider = await build_ozon_provider(s, task.provider)
         entry_type, entry_value = task.entry_type, task.entry_value
         start_page = (task.cursor or {}).get("page", 0) + 1
         prior_stats = task.stats or {}
@@ -77,6 +78,14 @@ async def run_collect_core(session_factory: async_sessionmaker, task_id: int, *,
                 # 若外部把状态置为 paused，则停止
                 paused = task.status == "paused"
                 await s.commit()
+        except CrawlerBlockedError as exc:
+            async with session_factory() as s:
+                task = (await s.execute(select(CollectTask).where(CollectTask.id == task_id))).scalar_one()
+                task.status = "failed"
+                task.stats = {**(task.stats or {}), "error": str(exc)}
+                await s.commit()
+            log.error("crawler_blocked", error=str(exc))
+            return {"inserted": total_inserted, "skipped": total_skipped, "pages": pages_done, "error": str(exc)}
         except Exception as exc:
             # 连续失败标 failed 并留日志（spec §4.2.6）：保留已提交的 cursor/stats 以便人工排查后续跑
             log.error("collect_failed", page=page, error=str(exc))
