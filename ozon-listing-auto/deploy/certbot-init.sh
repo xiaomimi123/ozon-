@@ -8,10 +8,10 @@ set -e
 : "${CERTBOT_EMAIL:?需设置 CERTBOT_EMAIL}"
 
 # 确保没有别的容器占用 80（若之前起过全栈，先停 nginx）
-docker compose -f docker-compose.prod.yml stop nginx 2>/dev/null || true
+docker compose -f docker-compose.prod.yml --env-file .env.prod stop nginx 2>/dev/null || true
 
 # standalone 一次性签发（临时把宿主 80 映射给 certbot 容器）
-docker compose -f docker-compose.prod.yml run --rm -p 80:80 --entrypoint certbot certbot \
+docker compose -f docker-compose.prod.yml --env-file .env.prod run --rm -p 80:80 --entrypoint certbot certbot \
   certonly --standalone \
   -d "$DOMAIN" --email "$CERTBOT_EMAIL" --agree-tos --no-eff-email
 

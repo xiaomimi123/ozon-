@@ -34,3 +34,9 @@ def test_certbot_init_uses_standalone_bootstrap_not_nginx_first():
     assert "certonly" in script
     assert "--standalone" in script
     assert "up -d nginx" not in script                 # 不应在签证前先起 nginx
+
+    # 回归测试：docker compose 插值整份 compose 文件时会先校验 POSTGRES_PASSWORD 等
+    # `${VAR:?}` 变量，若不带 --env-file .env.prod 会在 certbot 启动前就直接中止。
+    for line in script.splitlines():
+        if "docker compose -f docker-compose.prod.yml" in line:
+            assert "--env-file" in line, f"缺少 --env-file: {line!r}"
