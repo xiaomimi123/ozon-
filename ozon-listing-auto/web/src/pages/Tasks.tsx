@@ -1,12 +1,26 @@
 import { useEffect, useState } from "react";
-import { Card, Form, Input, Select, Switch, InputNumber, Button, Table, Space, message, Tag } from "antd";
+import { Card, Form, Input, Select, Switch, InputNumber, Button, Table, Space, message, Tag, TreeSelect } from "antd";
 import { createTask, listTasks, startCollect, pauseCollect, TaskBody } from "../api/tasks";
+import { getCategories } from "../api/category";
 
 export default function Tasks() {
   const [rows, setRows] = useState<any[]>([]);
   const [form] = Form.useForm();
   const refresh = () => listTasks().then(setRows);
   useEffect(() => { refresh(); }, []);
+
+  const [catTree, setCatTree] = useState<any[]>([]);
+  const loadRoots = async () => {
+    if (catTree.length === 0) {
+      const ns = await getCategories();
+      setCatTree(ns.map((n: any) => ({ id: String(n.id), pId: 0, value: n.path, title: n.name, isLeaf: n.leaf })));
+    }
+  };
+  const onLoadCat = async (node: any) => {
+    const children = await getCategories(Number(node.id));
+    setCatTree((prev) => prev.concat(children.map((n: any) => ({
+      id: String(n.id), pId: node.id, value: n.path, title: n.name, isLeaf: n.leaf }))));
+  };
 
   const onCreate = async (v: any) => {
     const body: TaskBody = {
@@ -33,7 +47,18 @@ export default function Tasks() {
               { value: "keyword", label: "关键词" }, { value: "category", label: "类目" },
               { value: "seller", label: "竞品店铺" }, { value: "own_shop", label: "自有店" }]} />
           </Form.Item>
-          <Form.Item name="entry_value" rules={[{ required: true }]}><Input placeholder="关键词/类目URL/卖家ID" /></Form.Item>
+          <Form.Item noStyle shouldUpdate={(p, c) => p.entry_type !== c.entry_type}>
+            {({ getFieldValue }) => getFieldValue("entry_type") === "category" ? (
+              <Form.Item name="entry_value" rules={[{ required: true }]}>
+                <TreeSelect treeDataSimpleMode style={{ width: 240 }} placeholder="浏览选择类目"
+                  treeData={catTree} loadData={onLoadCat} onFocus={loadRoots} allowClear />
+              </Form.Item>
+            ) : (
+              <Form.Item name="entry_value" rules={[{ required: true }]}>
+                <Input placeholder="关键词 / 卖家ID" />
+              </Form.Item>
+            )}
+          </Form.Item>
           <Form.Item name="provider" label="采集源">
             <Select style={{ width: 120 }} options={[{ value: "mock", label: "Mock" }, { value: "composer", label: "爬虫" }, { value: "apify", label: "Apify" }]} />
           </Form.Item>

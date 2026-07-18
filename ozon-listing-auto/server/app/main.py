@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from app.core.config import settings
 from app.core.logging import setup_logging
 from app.api.auth import router as auth_router
 from app.api.imagegen import router as imagegen_router
@@ -46,7 +47,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Ozon 跟卖/铺货自动化系统", version="0.1.0", lifespan=lifespan)
 app.add_middleware(
-    CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
+    CORSMiddleware, allow_origins=settings.cors_origins, allow_methods=["*"],
+    allow_headers=["*"], allow_credentials=False,
 )
 app.include_router(auth_router)
 # imagegen_router(/settings/imagegen) 须先于 settings_router(/settings/{category}) 注册：

@@ -23,5 +23,9 @@ class Settings(BaseSettings):
     progress_backend: str = "memory"    # memory | redis
     # 改图 provider：mock(默认) | local(Pillow 真实) | openai_compat | http。本地类操作恒走 local。
     image_provider: str = "mock"
+    # 登录失败限流（§3.2）：窗口内失败达 max 次锁定 lockout 秒。
+    login_max_attempts: int = 5
+    login_window_sec: int = 300
+    login_lockout_sec: int = 900
 
 settings = Settings()

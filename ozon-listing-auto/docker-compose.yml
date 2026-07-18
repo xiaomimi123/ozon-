@@ -1,3 +1,5 @@
+# 本地测试/开发栈（HTTP）：上服务器前用它把「建任务→采集→匹配→评分→审核→定价→上架→监控」全流程验证一遍。
+# 生产环境（域名 + HTTPS）请用 docker-compose.prod.yml，详见 docs/部署与访问说明.md。
 services:
   db:
     image: pgvector/pgvector:pg16
