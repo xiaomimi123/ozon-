@@ -1,0 +1,62 @@
+# 生产栈：nginx 终结 TLS + 反代；db/redis/api/worker 不发布公网端口。
+# 首次签证见 deploy/certbot-init.sh；证书由 certbot 容器自动续期。
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ozon}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env.prod}
+      POSTGRES_DB: ${POSTGRES_DB:-ozon}
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ozon} -d ${POSTGRES_DB:-ozon}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+  api:
+    build: ./server
+    env_file: .env.prod
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_started }
+    volumes: ["static:/app/static"]
+  worker:
+    build:
+      context: ./server
+      args:
+        INSTALL_ML: "${INSTALL_ML:-false}"
+    command: sh -c "arq app.workers.arq_worker.WorkerSettings"
+    env_file: .env.prod
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_started }
+    volumes: ["static:/app/static"]
+  nginx:
+    build: ./web
+    environment:
+      DOMAIN: ${DOMAIN:?set in .env.prod}
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./deploy/nginx.prod.conf:/etc/nginx/templates/default.conf.template:ro
+      - letsencrypt:/etc/letsencrypt
+      - certbot-webroot:/var/www/certbot
+    depends_on: [api]
+    restart: unless-stopped
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - letsencrypt:/etc/letsencrypt
+      - certbot-webroot:/var/www/certbot
+    entrypoint: /bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot; sleep 12h & wait $${!}; done'
+    restart: unless-stopped
+volumes:
+  pgdata:
+  static:
+  letsencrypt:
+  certbot-webroot:

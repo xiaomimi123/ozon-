@@ -1,0 +1,27 @@
+import pathlib
+import yaml
+
+_ROOT = pathlib.Path(__file__).resolve().parents[2]   # ozon-listing-auto/
+
+
+def test_prod_compose_is_valid_and_hardened():
+    data = yaml.safe_load((_ROOT / "docker-compose.prod.yml").read_text())
+    svcs = data["services"]
+    # 内部服务不发布公网端口
+    for name in ("db", "redis", "api", "worker"):
+        assert name in svcs, f"缺少服务 {name}"
+        assert "ports" not in svcs[name], f"{name} 不应对公网发布端口"
+    # nginx 对外 80/443
+    nginx_ports = " ".join(str(p) for p in svcs["nginx"]["ports"])
+    assert "443" in nginx_ports and "80" in nginx_ports
+    assert "certbot" in svcs, "缺少 certbot 服务"
+
+
+def test_prod_deploy_files_exist():
+    assert (_ROOT / "deploy" / "nginx.prod.conf").exists()
+    assert (_ROOT / "deploy" / "certbot-init.sh").exists()
+    assert (_ROOT / ".env.prod.example").exists()
+    conf = (_ROOT / "deploy" / "nginx.prod.conf").read_text()
+    assert "listen 443 ssl" in conf and "Strict-Transport-Security" in conf
+    assert "/api/" in conf and "/ws/" in conf and "Upgrade" in conf
+    assert "301 https" in conf                        # 80→443 强制跳转
