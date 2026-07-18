@@ -73,7 +73,7 @@
 
 ---
 
-## 4. 子项 D — 真实 CLIP（跨平台去重向量）
+## 4. 子项 D — 真实 CLIP（跨平台去重向量）✅ 已完成（@live 冒烟 + 构建核对 + 文档）
 
 **目标**：货源匹配的图片向量从 mock 切到真实中文 CLIP（`cn_clip ViT-B/16` CPU 推理）。
 
@@ -146,7 +146,7 @@
 | A LLM ✅ 已完成 | 配置页+接线+@live 脚手架+文档 | 填通义千问 key，跑一次 @live | ✅ 是 |
 | B 类目树 ✅ 已完成 | RealCategoryTree+**实抓对齐**+@live+文档 | 提供 cookie，跑 @live | ✅ 是 |
 | C 生图 | 两 provider 请求/响应层+字段映射+@live+文档 | 提供服务+key(+HTTP 样例)，跑 @live | ✅ 是（HttpImageProvider 需你样例） |
-| D CLIP | 冒烟+文档+构建路径验证 | 服务器装 [ml] 重建 worker，跑向量冒烟 | ✅ 是（重跑在你环境） |
+| D CLIP ✅ 已完成 | 冒烟+文档+构建路径验证 | 服务器装 [ml] 重建 worker，跑向量冒烟 | ✅ 是（重跑在你环境） |
 | E Ozon Seller | **联网查文档对齐**端点/请求体+@live+文档 | 沙箱凭据跑 @live，按报错迭代 | ⚠️ 尽力，需你沙箱迭代 |
 | F1 1688 | endpoint 校验+账号池接入+@live+文档 | 提供 1688 cookie，跑 @live | ⚠️ 尽力，需你 cookie |
 | F2 拼多多 | （后续独立子项目） | selenium/代理基建 | ❌ 本轮不做 |
