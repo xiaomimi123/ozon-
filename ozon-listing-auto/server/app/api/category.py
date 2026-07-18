@@ -8,7 +8,7 @@ from app.models import SupplyCandidate, User
 from app.schemas.category import CategoryNode, SuggestOut, ConfirmCategoryIn
 from app.services.category_tree import get_category_tree
 from app.services.category_map import suggest_category, confirm_category
-from app.services.llm.factory import get_llm
+from app.services.llm.config import get_configured_llm
 
 router = APIRouter(tags=["category"])
 
@@ -24,7 +24,7 @@ async def suggest(candidate_id: int, s: AsyncSession = Depends(get_session),
     c = (await s.execute(select(SupplyCandidate).where(SupplyCandidate.id == candidate_id))).scalar_one_or_none()
     if not c:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "候选不存在")
-    res = await suggest_category(s, c, llm=get_llm("mock"), tree=get_category_tree("mock"))
+    res = await suggest_category(s, c, llm=await get_configured_llm(s), tree=get_category_tree("mock"))
     await s.commit()   # memory 命中会 +usage_count
     return SuggestOut(**res)
 
