@@ -32,7 +32,12 @@ async def listing_build(task_id: int, shop_id: int | None = None, s: AsyncSessio
     if not t:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "任务不存在")
     params = await _pricing_params(s)
-    r = await build_follow_drafts(s, task_id, params=params, shop_id=shop_id); await s.commit()
+    if t.listing_mode == "create":
+        from app.services.listing_builder import build_create_drafts
+        r = await build_create_drafts(s, task_id, params=params, shop_id=shop_id)
+    else:
+        r = await build_follow_drafts(s, task_id, params=params, shop_id=shop_id)
+    await s.commit()
     return r
 
 @router.get("/drafts", response_model=list[DraftOut])

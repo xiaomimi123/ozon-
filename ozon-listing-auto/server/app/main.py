@@ -1,10 +1,13 @@
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.core.logging import setup_logging
 from app.api.auth import router as auth_router
+from app.api.imagegen import router as imagegen_router
 from app.api.settings import router as settings_router
 from app.api.tasks import router as tasks_router
 from app.api.collect import router as collect_router
@@ -19,6 +22,8 @@ from app.api.shops import router as shops_router
 from app.api.listing import router as listing_router
 from app.api.pace import router as pace_router
 from app.api.publish import router as publish_router
+from app.api.images import router as images_router
+from app.api.category import router as category_router
 
 setup_logging()
 
@@ -44,6 +49,9 @@ app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
 )
 app.include_router(auth_router)
+# imagegen_router(/settings/imagegen) 须先于 settings_router(/settings/{category}) 注册：
+# Starlette 按注册顺序匹配路由，通配的 {category} 若排在前面会先吞掉 /settings/imagegen。
+app.include_router(imagegen_router)
 app.include_router(settings_router)
 app.include_router(tasks_router)
 app.include_router(collect_router)
@@ -58,6 +66,12 @@ app.include_router(shops_router)
 app.include_router(listing_router)
 app.include_router(pace_router)
 app.include_router(publish_router)
+app.include_router(images_router)
+app.include_router(category_router)
+
+# 改图产物静态目录：static/images 下的处理产物经 /static 对外暴露。
+os.makedirs("static/images", exist_ok=True)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/health")
 async def health():

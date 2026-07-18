@@ -21,5 +21,7 @@ class Settings(BaseSettings):
     ozon_seller_provider: str = "mock"   # mock | real; 真实挂靠需配 real + 店铺真实凭据
     # 进度广播后端：memory（默认，单进程本地 fan-out）或 redis（跨进程 pub/sub，worker/API 分离时用）。
     progress_backend: str = "memory"    # memory | redis
+    # 改图 provider：mock(默认) | local(Pillow 真实) | openai_compat | http。本地类操作恒走 local。
+    image_provider: str = "mock"
 
 settings = Settings()

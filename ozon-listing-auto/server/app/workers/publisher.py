@@ -30,9 +30,23 @@ async def apply_auto_confirm(session: AsyncSession, task_id: int) -> dict:
 
 async def confirm_draft(session: AsyncSession, draft_id: int) -> dict:
     d = (await session.execute(select(ListingDraft).where(ListingDraft.id == draft_id))).scalar_one()
+    if d.mode == "create" and (d.category_id is None or not d.images):
+        return {"draft_id": draft_id, "status": d.status, "error": "自建草稿需先确认类目与图片再确认上架"}
     if d.status in ("draft",):
         d.status = "confirmed"
     return {"draft_id": draft_id, "status": d.status}
+
+async def _call_seller(seller, d, offer_id: str, *, client_id: str, api_key: str):
+    """按 draft.mode 分派 Ozon 写入：create → create_product；follow → create_follow_offer(§5.9)。"""
+    price = float(d.price) if d.price is not None else 0.0
+    if d.mode == "create":
+        return await seller.create_product(
+            client_id=client_id, api_key=api_key, offer_id=offer_id, title=d.title or "",
+            description=d.description or "", category_id=d.category_id, attributes=d.attributes or {},
+            images=d.images or [], price=price, stock=d.stock_qty, barcode=d.barcode)
+    return await seller.create_follow_offer(
+        client_id=client_id, api_key=api_key, target_sku=d.target_ozon_sku, barcode=d.barcode,
+        price=price, stock=d.stock_qty, offer_id=offer_id)
 
 async def run_publish_core(session_factory: async_sessionmaker, task_id: int, *, seller,
                            max_drafts=None, progress_cb=None) -> dict:
@@ -52,9 +66,7 @@ async def run_publish_core(session_factory: async_sessionmaker, task_id: int, *,
                 client_id = shop.client_id if shop else ""
                 api_key = decrypt(shop.api_key_encrypted) if shop else ""
                 offer_id = str((await s.execute(select(SupplyCandidate.offer_id).where(SupplyCandidate.id == d.candidate_id))).scalar_one())
-                res = await seller.create_follow_offer(
-                    client_id=client_id, api_key=api_key, target_sku=d.target_ozon_sku, barcode=d.barcode,
-                    price=float(d.price) if d.price is not None else 0.0, stock=d.stock_qty, offer_id=offer_id)
+                res = await _call_seller(seller, d, offer_id, client_id=client_id, api_key=api_key)
                 if res.ok:
                     d.status = "published"; d.ozon_result = {"ozon_product_id": res.ozon_product_id, "status": res.status}
                     published += 1
@@ -122,10 +134,9 @@ async def tick_publish(session_factory, task_id: int, *, seller, now, max_batch:
             try:
                 shop = (await s.execute(select(Shop).where(Shop.id == d.shop_id))).scalar_one_or_none() if d.shop_id else None
                 offer_id = str((await s.execute(select(SupplyCandidate.offer_id).where(SupplyCandidate.id == d.candidate_id))).scalar_one())
-                res = await seller.create_follow_offer(
-                    client_id=(shop.client_id if shop else ""), api_key=(decrypt(shop.api_key_encrypted) if shop else ""),
-                    target_sku=d.target_ozon_sku, barcode=d.barcode,
-                    price=float(d.price) if d.price is not None else 0.0, stock=d.stock_qty, offer_id=offer_id)
+                res = await _call_seller(seller, d, offer_id,
+                    client_id=(shop.client_id if shop else ""),
+                    api_key=(decrypt(shop.api_key_encrypted) if shop else ""))
                 if res.ok:
                     d.ozon_result = {"ozon_product_id": res.ozon_product_id, "status": res.status}
                     d.status = "pending_review" if wait_approval else "published"

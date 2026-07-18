@@ -30,12 +30,17 @@ class ListingDraft(Base):
     )
     id: Mapped[int] = mapped_column(primary_key=True)
     task_id: Mapped[int] = mapped_column(ForeignKey("collect_tasks.id"), index=True)
-    ozon_product_id: Mapped[int] = mapped_column(ForeignKey("ozon_products.id"))
+    ozon_product_id: Mapped[int | None] = mapped_column(ForeignKey("ozon_products.id"), nullable=True)  # 自建无跟卖目标卡
     candidate_id: Mapped[int] = mapped_column(ForeignKey("supply_candidates.id"))
     shop_id: Mapped[int | None] = mapped_column(ForeignKey("shops.id"), nullable=True)
     mode: Mapped[str] = mapped_column(String(8), default="follow")
     target_ozon_sku: Mapped[str | None] = mapped_column(String(64), nullable=True)
     barcode: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    title: Mapped[str | None] = mapped_column(String(1024), nullable=True)         # 自建：译后标题
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)           # 自建：描述
+    category_id: Mapped[int | None] = mapped_column(Integer, nullable=True)        # 自建：Ozon 类目 id
+    attributes: Mapped[dict | None] = mapped_column(_JSONB, nullable=True)         # 自建：类目属性 {attr_id: value}
+    images: Mapped[list | None] = mapped_column(_JSONB, nullable=True)             # 自建：已确认图片 url 列表(有序)
     price: Mapped[float | None] = mapped_column(Numeric(14, 2), nullable=True)
     currency: Mapped[str] = mapped_column(String(8), default="RUB")
     stock_qty: Mapped[int] = mapped_column(Integer, default=0)
