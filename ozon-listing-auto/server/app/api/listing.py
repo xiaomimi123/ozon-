@@ -10,6 +10,7 @@ from app.schemas.listing import DraftOut
 from app.services.listing_builder import build_follow_drafts
 from app.services.pricing import DEFAULT_PRICING
 from app.services.settings_store import get_category
+from app.services.category_tree import build_category_tree
 from app.workers.publisher import apply_auto_confirm, confirm_draft, run_publish_core
 from app.services.ozon_seller.factory import get_ozon_seller
 
@@ -35,7 +36,9 @@ async def listing_build(task_id: int, shop_id: int | None = None, s: AsyncSessio
     if t.listing_mode == "create":
         from app.services.listing_builder import build_create_drafts
         from app.services.llm.config import get_configured_llm
-        r = await build_create_drafts(s, task_id, params=params, shop_id=shop_id, llm=await get_configured_llm(s))
+        name = (await get_category(s, "system")).get("category_tree_provider", "mock")
+        r = await build_create_drafts(s, task_id, params=params, shop_id=shop_id, llm=await get_configured_llm(s),
+                                      tree=await build_category_tree(s, name))
     else:
         r = await build_follow_drafts(s, task_id, params=params, shop_id=shop_id)
     await s.commit()

@@ -33,7 +33,7 @@
 
 ---
 
-## 2. 子项 B — RealCategoryTree（类目树真实化）
+## 2. 子项 B — RealCategoryTree（类目树真实化）✅ 已完成（RealCategoryTree + 配置切换 + 前端 + @live + 文档）
 
 **目标**：自建分支的类目建议从 M6 mock 固定小树切到真实 Ozon 全量类目树（`composer-api categoryChildV3`）。
 
@@ -144,7 +144,7 @@
 | 子项 | 我交付（无人值守） | 你负责（live 验证） | 能否本轮相对完整 |
 |---|---|---|---|
 | A LLM ✅ 已完成 | 配置页+接线+@live 脚手架+文档 | 填通义千问 key，跑一次 @live | ✅ 是 |
-| B 类目树 | RealCategoryTree+**实抓对齐**+@live+文档 | 提供 cookie，跑 @live | ✅ 是 |
+| B 类目树 ✅ 已完成 | RealCategoryTree+**实抓对齐**+@live+文档 | 提供 cookie，跑 @live | ✅ 是 |
 | C 生图 | 两 provider 请求/响应层+字段映射+@live+文档 | 提供服务+key(+HTTP 样例)，跑 @live | ✅ 是（HttpImageProvider 需你样例） |
 | D CLIP | 冒烟+文档+构建路径验证 | 服务器装 [ml] 重建 worker，跑向量冒烟 | ✅ 是（重跑在你环境） |
 | E Ozon Seller | **联网查文档对齐**端点/请求体+@live+文档 | 沙箱凭据跑 @live，按报错迭代 | ⚠️ 尽力，需你沙箱迭代 |
