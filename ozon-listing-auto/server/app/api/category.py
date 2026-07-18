@@ -6,16 +6,19 @@ from app.core.db import get_session
 from app.api.deps import require_role
 from app.models import SupplyCandidate, User
 from app.schemas.category import CategoryNode, SuggestOut, ConfirmCategoryIn
-from app.services.category_tree import get_category_tree
+from app.services.category_tree import build_category_tree
 from app.services.category_map import suggest_category, confirm_category
 from app.services.llm.config import get_configured_llm
+from app.services.settings_store import get_category
 
 router = APIRouter(tags=["category"])
 
 
 @router.get("/categories", response_model=list[CategoryNode])
-async def categories(parent_id: int | None = None, _: User = Depends(require_role("operator"))):
-    return await get_category_tree("mock").list_children(parent_id=parent_id)
+async def categories(parent_id: int | None = None, s: AsyncSession = Depends(get_session),
+                     _: User = Depends(require_role("operator"))):
+    name = (await get_category(s, "system")).get("category_tree_provider", "mock")
+    return await (await build_category_tree(s, name)).list_children(parent_id=parent_id)
 
 
 @router.post("/category/suggest", response_model=SuggestOut)
@@ -24,7 +27,8 @@ async def suggest(candidate_id: int, s: AsyncSession = Depends(get_session),
     c = (await s.execute(select(SupplyCandidate).where(SupplyCandidate.id == candidate_id))).scalar_one_or_none()
     if not c:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "候选不存在")
-    res = await suggest_category(s, c, llm=await get_configured_llm(s), tree=get_category_tree("mock"))
+    name = (await get_category(s, "system")).get("category_tree_provider", "mock")
+    res = await suggest_category(s, c, llm=await get_configured_llm(s), tree=await build_category_tree(s, name))
     await s.commit()   # memory 命中会 +usage_count
     return SuggestOut(**res)
 

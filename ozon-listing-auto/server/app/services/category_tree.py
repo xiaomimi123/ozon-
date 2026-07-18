@@ -36,3 +36,14 @@ def get_category_tree(name: str = "mock") -> CategoryTreeProvider:
         from app.services.ozon_market.category_tree_real import RealCategoryTree  # live 后置
         return RealCategoryTree()
     raise ValueError(f"未知 category tree: {name}")
+
+
+async def build_category_tree(session, name: str):
+    """配置驱动：real → get_crawler_conf 取 cookie/proxy 构造 RealCategoryTree；mock → MockCategoryTree。"""
+    if name == "real":
+        from app.services.ozon_market.category_tree_real import RealCategoryTree
+        from app.services.crawler_conf import get_crawler_conf
+        c = await get_crawler_conf(session)
+        return RealCategoryTree(cookie=c.get("cookie") or None, proxy=c.get("proxy") or None,
+                                timeout=c["timeout"], max_retries=c["max_retries"])
+    return MockCategoryTree()

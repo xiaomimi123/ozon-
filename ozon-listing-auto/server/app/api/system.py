@@ -1,4 +1,4 @@
-"""系统配置 API(admin)：全局 Ozon Seller provider(mock|real)切换。"""
+"""系统配置 API(admin)：全局 Ozon Seller provider(mock|real) + 类目树 provider(mock|real) 切换。"""
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import get_session
@@ -14,11 +14,14 @@ _CAT = "system"
 @router.get("", response_model=SystemOut)
 async def read(s: AsyncSession = Depends(get_session), _: User = Depends(require_role("admin"))):
     m = await store.get_category(s, _CAT)
-    return SystemOut(ozon_seller_provider=m.get("ozon_seller_provider", "mock"))
+    return SystemOut(ozon_seller_provider=m.get("ozon_seller_provider", "mock"),
+                     category_tree_provider=m.get("category_tree_provider", "mock"))
 
 
 @router.put("", response_model=SystemOut)
 async def write(body: SystemIn, s: AsyncSession = Depends(get_session), u: User = Depends(require_role("admin"))):
     await store.set_value(s, _CAT, "ozon_seller_provider", body.ozon_seller_provider, is_secret=False, updated_by=u.id)
+    await store.set_value(s, _CAT, "category_tree_provider", body.category_tree_provider, is_secret=False, updated_by=u.id)
     await s.commit()
-    return SystemOut(ozon_seller_provider=body.ozon_seller_provider)
+    return SystemOut(ozon_seller_provider=body.ozon_seller_provider,
+                     category_tree_provider=body.category_tree_provider)
