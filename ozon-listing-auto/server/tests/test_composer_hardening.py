@@ -8,7 +8,7 @@ from app.services.ozon_market.composer import OzonComposerProvider, CrawlerBlock
 def _no_sleep(monkeypatch):
     async def _fast(*a, **k):
         return None
-    monkeypatch.setattr("app.services.ozon_market.composer.asyncio.sleep", _fast)
+    monkeypatch.setattr("app.services.ozon_market.composer_http.asyncio.sleep", _fast)
 
 
 @pytest.mark.asyncio
