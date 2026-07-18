@@ -27,14 +27,24 @@ class RealCategoryTree:
 
 
 def _parse_category_children(payload: dict) -> list[dict]:
-    """初版容错解析（Task 3 用实抓样本对齐真实字段路径）。找不到返回 []，不崩。"""
+    """初版容错解析（Task 3 用实抓样本对齐真实字段路径）。任何非预期结构都跳过/返回 []，绝不崩。"""
+    if not isinstance(payload, dict):
+        return []
     items = payload.get("categories") or payload.get("items") or []
+    if not isinstance(items, list):
+        return []
     out = []
-    for it in items if isinstance(items, list) else []:
+    for it in items:
+        if not isinstance(it, dict):
+            continue
         cid = it.get("id") or it.get("categoryId")
         if cid is None:
             continue
-        out.append({"id": int(cid), "name": it.get("title") or it.get("name"),
+        try:
+            cid = int(cid)
+        except (TypeError, ValueError):
+            continue
+        out.append({"id": cid, "name": it.get("title") or it.get("name"),
                     "path": it.get("path") or it.get("title") or it.get("name"),
                     "leaf": bool(it.get("isLeaf") or it.get("leaf"))})
     return out

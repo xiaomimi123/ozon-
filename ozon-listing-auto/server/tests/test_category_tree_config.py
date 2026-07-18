@@ -46,3 +46,11 @@ async def test_categories_endpoint_default_mock(client, db_session):
     h = await _admin(client, db_session)
     r = await client.get("/categories", headers=h)   # 默认 mock, 返回固定小树根
     assert r.status_code == 200 and isinstance(r.json(), list) and r.json()
+
+
+def test_parse_category_children_tolerant():
+    from app.services.ozon_market.category_tree_real import _parse_category_children
+    assert _parse_category_children([]) == []
+    assert _parse_category_children({"categories": [1, 2, 3]}) == []
+    out = _parse_category_children({"categories": [{"id": "abc"}, {"id": 5, "name": "X"}]})
+    assert len(out) == 1 and out[0]["id"] == 5
