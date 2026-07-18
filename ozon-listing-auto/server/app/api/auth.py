@@ -15,8 +15,13 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/login", response_model=TokenOut)
 async def login(request: Request, form: OAuth2PasswordRequestForm = Depends(), s: AsyncSession = Depends(get_session)):
-    ip = (request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
-          or (request.client.host if request.client else "?"))   # 生产在 nginx 后, 取 XFF 首段
+    xff = request.headers.get("X-Forwarded-For", "")
+    ip = (request.headers.get("X-Real-IP")
+          or (xff.split(",")[-1].strip() if xff else "")
+          or (request.client.host if request.client else "?"))
+    # 生产在 nginx 后：X-Real-IP 由 nginx 用 $remote_addr 覆盖写入，客户端无法伪造，优先使用；
+    # 退化到 XFF 时取最后一跳（nginx 用 $proxy_add_x_forwarded_for 追加，最后一跳才是可信来源），
+    # 不可再取首段——首段可被客户端任意伪造，会让限流按伪造 key 分桶从而被绕过。
     key = f"{form.username}|{ip}"
     now = datetime.now(timezone.utc)
     remaining = login_throttle.check(key, now=now)

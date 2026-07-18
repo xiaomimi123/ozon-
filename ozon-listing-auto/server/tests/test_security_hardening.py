@@ -56,3 +56,34 @@ async def test_login_rate_limited_after_failures(client, db_session):
     login_throttle.clear()
     ok = await client.post("/auth/login", data={"username": "thr", "password": "right"})
     assert ok.status_code == 200 and ok.json()["access_token"]
+
+
+@pytest.mark.asyncio
+async def test_login_throttle_keys_on_real_ip_not_spoofable_xff(client, db_session):
+    # 回归测试：nginx 用 $proxy_add_x_forwarded_for 会在 XFF 上"追加"真实连入 IP，
+    # 客户端可在自己发的请求里预先塞一个假的第一段、每次换一个，从而在旧的
+    # "取 XFF 首段" 逻辑下让限流 key 每次都不同、绕过锁定。
+    # X-Real-IP 由 nginx 用 $remote_addr 覆盖写入，客户端发送的值到不了后端，权威可信。
+    login_throttle.clear()
+    db_session.add(User(username="thr2", password_hash=hash_password("right"), role="operator"))
+    await db_session.commit()
+    for i in range(5):
+        r = await client.post(
+            "/auth/login",
+            data={"username": "thr2", "password": "wrong"},
+            headers={
+                "X-Real-IP": "9.9.9.9",
+                "X-Forwarded-For": f"1.2.3.{i}, 9.9.9.9",   # 每次伪造不同的首段
+            },
+        )
+        assert r.status_code == 401
+    r = await client.post(
+        "/auth/login",
+        data={"username": "thr2", "password": "wrong"},
+        headers={
+            "X-Real-IP": "9.9.9.9",
+            "X-Forwarded-For": "6.6.6.6, 9.9.9.9",   # 首段又换了一个, 但 X-Real-IP 不变
+        },
+    )
+    assert r.status_code == 429 and "Retry-After" in r.headers
+    login_throttle.clear()
