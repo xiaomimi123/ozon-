@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { vi } from "vitest";
 vi.mock("../../api/sourceAccounts", () => ({
   listAccounts: vi.fn(() => Promise.resolve([
@@ -12,8 +12,10 @@ import SourceAccounts from "./SourceAccounts";
 
 test("渲染货源账号表格与新增表单", async () => {
   render(<SourceAccounts />);
-  expect(await screen.findByText("新增账号")).toBeInTheDocument();
+  expect(await screen.findByText("新增账号", { selector: ".ant-card-head-title" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "新增账号" })).toBeInTheDocument();
   expect(await screen.findByText("号1")).toBeInTheDocument();
-  expect(await screen.findByText("1688")).toBeInTheDocument();   // 平台中文
-  expect(await screen.findByText("冷却中")).toBeInTheDocument();  // 状态中文
+  const table = screen.getByRole("table");
+  expect(within(table).getAllByText("1688").length).toBeGreaterThanOrEqual(1); // 平台中文（表格内）
+  expect(within(table).getByText("冷却中")).toBeInTheDocument();  // 状态中文
 });

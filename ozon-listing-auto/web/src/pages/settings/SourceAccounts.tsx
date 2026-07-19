@@ -48,9 +48,9 @@ export default function SourceAccounts() {
 
   return (
     <Space direction="vertical" style={{ width: "100%" }} size="large">
-      <Card title="添加账号">
+      <Card title="新增账号">
         <Form form={form} layout="vertical" onFinish={onCreate}
-          initialValues={{ platform: "pinduoduo", daily_limit: 200, min_interval_sec: 6 }} style={{ maxWidth: 560 }}>
+          initialValues={{ platform: "ali1688", daily_limit: 200, min_interval_sec: 6 }} style={{ maxWidth: 560 }}>
           <Form.Item name="platform" label="平台" rules={[{ required: true }]}>
             <Select options={PLATFORM_OPTIONS} style={{ width: 160 }} />
           </Form.Item>
