@@ -1,50 +1,106 @@
-"""RealOzonSeller：以条码/SKU 调 Ozon Seller API 创建跟卖 offer(live 默认跳过, 端点联调时定)。"""
+"""RealOzonSeller：对齐真实 Ozon Seller API(api-seller.ozon.ru, Client-Id+Api-Key 头)。
+跟卖 /v1/product/import-by-sku、自建 /v3/product/import、状态 /v1/product/import/info。
+真实调用 @live 校验(沙箱)；非 live 用 MockTransport 测请求/响应形状。"""
 from app.services.ozon_seller.base import PublishResult
 
-_ENDPOINT = "https://api-seller.ozon.ru/v2/product/import"   # 占位; 真实跟卖端点联调时校正
+_HOST = "https://api-seller.ozon.ru"
+_IMPORT_BY_SKU = f"{_HOST}/v1/product/import-by-sku"   # 跟卖：按目标 SKU 克隆卡片建 offer
+_IMPORT_V3 = f"{_HOST}/v3/product/import"               # 自建：创建新商品
+_IMPORT_INFO = f"{_HOST}/v1/product/import/info"        # 异步导入任务状态
+
+
+def _to_ozon_attributes(attrs: dict) -> list:
+    """草稿 {attr_id: value} → Ozon [{complex_id,id,values:[{value}]}]；非数字 key 跳过。"""
+    return [{"complex_id": 0, "id": int(k), "values": [{"value": str(v)}]}
+            for k, v in (attrs or {}).items() if str(k).isdigit()]
+
+
+def _fmt_price(v) -> str:
+    """价格转字符串：整数值去掉 .0（Ozon 期望 "2300" 而非 "2300.0"）。"""
+    try:
+        f = float(v)
+        return str(int(f)) if f.is_integer() else repr(f)
+    except (TypeError, ValueError):
+        return str(v)
+
 
 class RealOzonSeller:
     name = "real"
-    _IMPORT_ENDPOINT = "https://api-seller.ozon.ru/v2/product/import"  # 占位, live 校正
-    def __init__(self, timeout: float = 30.0):
+
+    def __init__(self, timeout: float = 30.0, transport=None):
         self._timeout = timeout
-    async def create_follow_offer(self, *, client_id, api_key, target_sku, barcode, price, stock, offer_id) -> PublishResult:
+        self._transport = transport
+
+    def _client(self):
         import httpx
-        headers = {"Client-Id": client_id, "Api-Key": api_key, "Content-Type": "application/json"}
-        body = {"items": [{"offer_id": offer_id, "barcode": barcode, "price": str(price),
-                           "stock": stock, "sku": target_sku}]}
+        kw = {"timeout": self._timeout}
+        if self._transport is not None:
+            kw["transport"] = self._transport
+        return httpx.AsyncClient(**kw)
+
+    @staticmethod
+    def _headers(client_id, api_key):
+        return {"Client-Id": str(client_id), "Api-Key": str(api_key), "Content-Type": "application/json"}
+
+    async def create_follow_offer(self, *, client_id, api_key, target_sku, barcode, price, stock, offer_id) -> PublishResult:
+        body = {"items": [{"sku": int(target_sku), "offer_id": str(offer_id),
+                           "price": _fmt_price(price), "currency_code": "RUB"}]}
         try:
-            async with httpx.AsyncClient(timeout=self._timeout) as c:
-                r = await c.post(_ENDPOINT, headers=headers, json=body)
+            async with self._client() as c:
+                r = await c.post(_IMPORT_BY_SKU, headers=self._headers(client_id, api_key), json=body)
                 r.raise_for_status()
                 data = r.json()
-            return PublishResult(ok=True, ozon_product_id=str(data.get("result", {}).get("task_id", offer_id)),
+            result = data.get("result", {})
+            if result.get("unmatched_sku_list"):
+                return PublishResult(ok=False, ozon_product_id=None, status="failed",
+                                     raw=data, error=f"SKU 未匹配/禁止复制: {result['unmatched_sku_list']}")
+            task_id = result.get("task_id")
+            if task_id is None:
+                return PublishResult(ok=False, ozon_product_id=None, status="failed",
+                                     raw=data, error="Ozon 响应缺 task_id")
+            return PublishResult(ok=True, ozon_product_id=str(task_id),
                                  status="pending_review", raw=data)
         except Exception as exc:  # noqa: BLE001
-            return PublishResult(ok=False, ozon_product_id=None, status="failed", error=str(exc))
-
-    async def get_product_status(self, *, client_id, api_key, ozon_product_id) -> str:
-        import httpx
-        headers = {"Client-Id": client_id, "Api-Key": api_key, "Content-Type": "application/json"}
-        try:
-            async with httpx.AsyncClient(timeout=self._timeout) as c:
-                r = await c.post("https://api-seller.ozon.ru/v2/product/info", headers=headers,
-                                 json={"product_id": ozon_product_id})   # 占位, 联调校正
-                r.raise_for_status()
-                data = r.json()
-            # 依 Ozon 返回映射 → approved|pending|rejected; 占位默认 pending
-            return "pending"
-        except Exception:  # noqa: BLE001
-            return "pending"
+            return PublishResult(ok=False, ozon_product_id=None, status="failed", error=str(exc) or exc.__class__.__name__)
 
     async def create_product(self, *, client_id, api_key, offer_id, title, description,
                              category_id, attributes, images, price, stock, barcode) -> PublishResult:
-        # live 后置：真实 /v2/product/import 的请求体字段/鉴权需与官方文档联调校正。
-        # 占位实现：构造请求体但不保证可直接用于生产（与 create_follow_offer 同范式），
-        # 且显式不发起真实网络请求，避免非 live 环境下的 live 泄漏。
-        payload = {"offer_id": offer_id, "name": title, "description_category_id": category_id,
-                   "attributes": attributes, "images": images, "price": str(price),
-                   "stock": stock, "barcode": barcode}
-        return PublishResult(ok=False, ozon_product_id=None, status="failed",
-                             raw={"endpoint": self._IMPORT_ENDPOINT, "payload_keys": list(payload)},
-                             error="RealOzonSeller.create_product 未联调(live 校正)")
+        # 注意：v3/product/import 真实自建还需 type_id + 尺寸/重量 + 属性字典值 id，草稿暂无 →
+        # 缺字段留空, 真实 import 审核会拒, 需后续扩草稿字段/人工补(见文档)。
+        item = {"offer_id": str(offer_id), "name": title or "", "description_category_id": category_id,
+                "price": _fmt_price(price), "currency_code": "RUB", "barcode": barcode or "",
+                "images": images or [], "attributes": _to_ozon_attributes(attributes)}
+        try:
+            async with self._client() as c:
+                r = await c.post(_IMPORT_V3, headers=self._headers(client_id, api_key), json={"items": [item]})
+                r.raise_for_status()
+                data = r.json()
+            task_id = data.get("result", {}).get("task_id")
+            if task_id is None:
+                return PublishResult(ok=False, ozon_product_id=None, status="failed",
+                                     raw=data, error="Ozon 响应缺 task_id")
+            return PublishResult(ok=True, ozon_product_id=str(task_id),
+                                 status="pending_review", raw=data,
+                                 error=None)
+        except Exception as exc:  # noqa: BLE001
+            return PublishResult(ok=False, ozon_product_id=None, status="failed", error=str(exc) or exc.__class__.__name__)
+
+    async def get_product_status(self, *, client_id, api_key, ozon_product_id) -> str:
+        # ozon_product_id 实为 create 返回的 import task_id；轮询 import/info 映射状态。
+        try:
+            task_id = int(ozon_product_id)
+        except (TypeError, ValueError):
+            return "pending"
+        try:
+            async with self._client() as c:
+                r = await c.post(_IMPORT_INFO, headers=self._headers(client_id, api_key), json={"task_id": task_id})
+                r.raise_for_status()
+                items = r.json().get("result", {}).get("items", [])
+            st = (items[0].get("status") if items else "") or ""
+            if st == "imported":
+                return "approved"
+            if st == "failed":
+                return "rejected"
+            return "pending"
+        except Exception:  # noqa: BLE001  查询失败按未出结果处理, 不误判
+            return "pending"
