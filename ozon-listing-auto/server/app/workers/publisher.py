@@ -42,7 +42,9 @@ async def _call_seller(seller, d, offer_id: str, *, client_id: str, api_key: str
         return await seller.create_product(
             client_id=client_id, api_key=api_key, offer_id=offer_id, title=d.title or "",
             description=d.description or "", category_id=d.category_id, attributes=d.attributes or {},
-            images=d.images or [], price=price, stock=d.stock_qty, barcode=d.barcode)
+            images=d.images or [], price=price, stock=d.stock_qty, barcode=d.barcode,
+            type_id=d.type_id, depth=d.depth, width=d.width, height=d.height,
+            weight=d.weight, dimension_unit=d.dimension_unit, weight_unit=d.weight_unit)
     return await seller.create_follow_offer(
         client_id=client_id, api_key=api_key, target_sku=d.target_ozon_sku, barcode=d.barcode,
         price=price, stock=d.stock_qty, offer_id=offer_id)

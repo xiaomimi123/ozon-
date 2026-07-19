@@ -121,3 +121,18 @@ async def test_follow_dry_run_builds_body_without_post():
 async def test_status_dry_run_is_approved():
     s = RealOzonSeller(transport=_boom_transport(), dry_run=True)
     assert await s.get_product_status(client_id="c", api_key="k", ozon_product_id="DRYRUN") == "approved"
+
+
+@pytest.mark.asyncio
+async def test_create_product_dry_run_includes_full_fields():
+    s = RealOzonSeller(transport=_boom_transport(), dry_run=True)
+    r = await s.create_product(client_id="c", api_key="k", offer_id="OF9", title="T", description="D",
+        category_id=17028922, type_id=93080, attributes={85: {"dictionary_value_id": 1000}, 9048: "手动名称"},
+        images=["u1"], price=1999.0, stock=3, barcode="B", depth=100, width=80, height=50,
+        weight=250, dimension_unit="mm", weight_unit="g")
+    item = r.raw["dry_run"]["items"][0]
+    assert item["description_category_id"] == 17028922 and item["type_id"] == 93080
+    assert item["depth"] == 100 and item["weight"] == 250 and item["dimension_unit"] == "mm"
+    ids = {a["id"]: a for a in item["attributes"]}
+    assert ids[85]["values"][0]["dictionary_value_id"] == 1000
+    assert ids[9048]["values"][0]["value"] == "手动名称"
