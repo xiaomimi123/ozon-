@@ -18,4 +18,8 @@ class OzonSellerProvider(Protocol):
     async def get_product_status(self, *, client_id: str, api_key: str, ozon_product_id: str) -> str: ...
     async def create_product(self, *, client_id: str, api_key: str, offer_id: str, title: str,
                              description: str, category_id: int | None, attributes: dict,
-                             images: list, price: float, stock: int, barcode: str | None) -> PublishResult: ...
+                             images: list, price: float, stock: int, barcode: str | None,
+                             type_id: int | None = None, depth: int | None = None,
+                             width: int | None = None, height: int | None = None,
+                             weight: int | None = None, dimension_unit: str = "mm",
+                             weight_unit: str = "g") -> PublishResult: ...

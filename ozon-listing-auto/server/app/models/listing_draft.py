@@ -41,6 +41,13 @@ class ListingDraft(Base):
     category_id: Mapped[int | None] = mapped_column(Integer, nullable=True)        # 自建：Ozon 类目 id
     attributes: Mapped[dict | None] = mapped_column(_JSONB, nullable=True)         # 自建：类目属性 {attr_id: value}
     images: Mapped[list | None] = mapped_column(_JSONB, nullable=True)             # 自建：已确认图片 url 列表(有序)
+    type_id: Mapped[int | None] = mapped_column(Integer, nullable=True)            # 自建：Ozon 类型 id
+    depth: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    width: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    height: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    weight: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    dimension_unit: Mapped[str] = mapped_column(String(8), default="mm")
+    weight_unit: Mapped[str] = mapped_column(String(8), default="g")
     price: Mapped[float | None] = mapped_column(Numeric(14, 2), nullable=True)
     currency: Mapped[str] = mapped_column(String(8), default="RUB")
     stock_qty: Mapped[int] = mapped_column(Integer, default=0)

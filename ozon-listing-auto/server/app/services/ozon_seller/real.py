@@ -10,9 +10,16 @@ _IMPORT_INFO = f"{_HOST}/v1/product/import/info"        # 异步导入任务状�
 
 
 def _to_ozon_attributes(attrs: dict) -> list:
-    """草稿 {attr_id: value} → Ozon [{complex_id,id,values:[{value}]}]；非数字 key 跳过。"""
-    return [{"complex_id": 0, "id": int(k), "values": [{"value": str(v)}]}
-            for k, v in (attrs or {}).items() if str(k).isdigit()]
+    """草稿 {attr_id: value} → Ozon [{complex_id,id,values:[...]}]；值为 {"dictionary_value_id": int}
+    时走属性字典值 id，否则(标量或 {"value":...})走自由文本 value。"""
+    out = []
+    for k, v in (attrs or {}).items():
+        if isinstance(v, dict) and "dictionary_value_id" in v:
+            values = [{"dictionary_value_id": int(v["dictionary_value_id"])}]
+        else:
+            values = [{"value": str(v.get("value") if isinstance(v, dict) else v)}]
+        out.append({"complex_id": 0, "id": int(k), "values": values})
+    return out
 
 
 def _fmt_price(v) -> str:
@@ -27,9 +34,10 @@ def _fmt_price(v) -> str:
 class RealOzonSeller:
     name = "real"
 
-    def __init__(self, timeout: float = 30.0, transport=None):
+    def __init__(self, timeout: float = 30.0, transport=None, dry_run: bool = False):
         self._timeout = timeout
         self._transport = transport
+        self._dry_run = dry_run
 
     def _client(self):
         import httpx
@@ -45,6 +53,8 @@ class RealOzonSeller:
     async def create_follow_offer(self, *, client_id, api_key, target_sku, barcode, price, stock, offer_id) -> PublishResult:
         body = {"items": [{"sku": int(target_sku), "offer_id": str(offer_id),
                            "price": _fmt_price(price), "currency_code": "RUB"}]}
+        if self._dry_run:
+            return PublishResult(ok=True, ozon_product_id="DRYRUN", status="pending_review", raw={"dry_run": body})
         try:
             async with self._client() as c:
                 r = await c.post(_IMPORT_BY_SKU, headers=self._headers(client_id, api_key), json=body)
@@ -64,12 +74,18 @@ class RealOzonSeller:
             return PublishResult(ok=False, ozon_product_id=None, status="failed", error=str(exc) or exc.__class__.__name__)
 
     async def create_product(self, *, client_id, api_key, offer_id, title, description,
-                             category_id, attributes, images, price, stock, barcode) -> PublishResult:
-        # 注意：v3/product/import 真实自建还需 type_id + 尺寸/重量 + 属性字典值 id，草稿暂无 →
-        # 缺字段留空, 真实 import 审核会拒, 需后续扩草稿字段/人工补(见文档)。
+                             category_id, attributes, images, price, stock, barcode,
+                             type_id=None, depth=None, width=None, height=None,
+                             weight=None, dimension_unit="mm", weight_unit="g") -> PublishResult:
         item = {"offer_id": str(offer_id), "name": title or "", "description_category_id": category_id,
-                "price": _fmt_price(price), "currency_code": "RUB", "barcode": barcode or "",
-                "images": images or [], "attributes": _to_ozon_attributes(attributes)}
+                "type_id": type_id, "price": _fmt_price(price), "currency_code": "RUB",
+                "barcode": barcode or "", "images": images or [],
+                "depth": depth, "width": width, "height": height, "dimension_unit": dimension_unit,
+                "weight": weight, "weight_unit": weight_unit,
+                "attributes": _to_ozon_attributes(attributes)}
+        if self._dry_run:
+            return PublishResult(ok=True, ozon_product_id="DRYRUN", status="pending_review",
+                                 raw={"dry_run": {"items": [item]}})
         try:
             async with self._client() as c:
                 r = await c.post(_IMPORT_V3, headers=self._headers(client_id, api_key), json={"items": [item]})
@@ -87,6 +103,8 @@ class RealOzonSeller:
 
     async def get_product_status(self, *, client_id, api_key, ozon_product_id) -> str:
         # ozon_product_id 实为 create 返回的 import task_id；轮询 import/info 映射状态。
+        if self._dry_run:
+            return "approved"
         try:
             task_id = int(ozon_product_id)
         except (TypeError, ValueError):

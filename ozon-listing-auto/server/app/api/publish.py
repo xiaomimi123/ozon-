@@ -10,7 +10,7 @@ from app.api.deps import require_role, get_current_user
 from app.models import CollectTask, ListingDraft, User
 from app.services.publish_scheduler import get_pace, plan_schedule
 from app.workers.publisher import tick_publish
-from app.services.ozon_seller.factory import get_ozon_seller
+from app.services.ozon_seller.resolve import resolve_seller
 
 router = APIRouter(prefix="/publish", tags=["publish"])
 
@@ -32,7 +32,7 @@ async def publish_schedule(task_id: int, s: AsyncSession = Depends(get_session),
 async def publish_tick(task_id: int, sync: bool = False, s: AsyncSession = Depends(get_session), _: User = Depends(require_role("publisher"))):
     await _task_or_404(s, task_id)
     if sync:
-        return await tick_publish(dbmod.async_session, task_id, seller=get_ozon_seller("mock"), now=datetime.now(timezone.utc))
+        return await tick_publish(dbmod.async_session, task_id, seller=await resolve_seller(s), now=datetime.now(timezone.utc))
     from arq import create_pool
     from arq.connections import RedisSettings
     from app.core.config import settings

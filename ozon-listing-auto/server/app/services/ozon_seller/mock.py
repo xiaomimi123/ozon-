@@ -11,7 +11,9 @@ class MockOzonSeller:
     async def get_product_status(self, *, client_id, api_key, ozon_product_id) -> str:
         return "pending" if ozon_product_id in self._pending else "approved"
     async def create_product(self, *, client_id, api_key, offer_id, title, description,
-                             category_id, attributes, images, price, stock, barcode) -> PublishResult:
+                             category_id, attributes, images, price, stock, barcode,
+                             type_id=None, depth=None, width=None, height=None,
+                             weight=None, dimension_unit="mm", weight_unit="g") -> PublishResult:
         return PublishResult(ok=True, ozon_product_id=f"OZC-{offer_id}", status="imported",
                              raw={"title": title, "category_id": category_id, "images": len(images or []),
                                   "price": price, "stock": stock})

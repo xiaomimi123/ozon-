@@ -7,6 +7,15 @@ vi.mock("../api/listing", () => ({
   autoConfirm: vi.fn(), publishDrafts: vi.fn(),
 }));
 vi.mock("../api/shops", () => ({ listShops: vi.fn(() => Promise.resolve([])) }));
+vi.mock("../api/category", () => ({
+  getCategories: vi.fn(() => Promise.resolve([])), suggestCategory: vi.fn(), confirmCategory: vi.fn(),
+}));
+vi.mock("../api/ozonCatalog", () => ({
+  getTypes: vi.fn(() => Promise.resolve([])),
+  getAttributes: vi.fn(() => Promise.resolve([])),
+  getAttributeValues: vi.fn(() => Promise.resolve([])),
+  confirmCreateFields: vi.fn(() => Promise.resolve({ ok: true })),
+}));
 import ListingReview from "./ListingReview";
 import { getDrafts, confirmDraft } from "../api/listing";
 
@@ -36,4 +45,15 @@ test("确认草稿返回 error 时不误报已确认", async () => {
 
   successSpy.mockRestore();
   warningSpy.mockRestore();
+});
+
+test("自建草稿显示补充信息入口", async () => {
+  (getDrafts as ReturnType<typeof vi.fn>).mockResolvedValue([
+    { id: 1, mode: "create", title: "自建品", category_id: 100, status: "draft" },
+  ]);
+  render(<ListingReview />);
+  const taskInput = screen.getByRole("spinbutton");
+  fireEvent.change(taskInput, { target: { value: "1" } });
+  fireEvent.click(screen.getByText(/刷\s*新/));
+  expect(await screen.findByText(/补充信息/)).toBeInTheDocument();
 });

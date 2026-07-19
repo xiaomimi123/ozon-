@@ -49,4 +49,7 @@ async def test_confirm_draft_create_gate_requires_category_and_images(db_session
     assert d.status == "draft" and "error" in r      # 缺类目/图 → 不确认
     d.category_id = 1; d.images = ["/static/images/x.png"]
     r2 = await confirm_draft(db_session, d.id)
-    assert d.status == "confirmed" and "error" not in r2
+    assert d.status == "draft" and "error" in r2     # 类目/图已补, 但缺类型/尺寸 → 仍不确认
+    d.type_id = 1; d.depth = 100; d.width = 80; d.height = 50; d.weight = 250
+    r3 = await confirm_draft(db_session, d.id)
+    assert d.status == "confirmed" and "error" not in r3

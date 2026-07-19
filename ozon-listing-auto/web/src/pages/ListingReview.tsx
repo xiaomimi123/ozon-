@@ -3,6 +3,7 @@ import { Card, InputNumber, Select, Button, Table, Space, Tag, Modal, Form, Inpu
 import { buildDrafts, getDrafts, confirmDraft, autoConfirm, publishDrafts } from "../api/listing";
 import { listShops } from "../api/shops";
 import { getCategories, suggestCategory, confirmCategory } from "../api/category";
+import { getTypes, getAttributes, getAttributeValues, confirmCreateFields } from "../api/ozonCatalog";
 import { useEffect } from "react";
 
 const ST: Record<string, string> = { draft: "default", confirmed: "blue", published: "green", failed: "red", below_min: "orange" };
@@ -16,6 +17,12 @@ export default function ListingReview() {
   const [catModalOpen, setCatModalOpen] = useState(false);
   const [editingRow, setEditingRow] = useState<any>(null);
   const [catForm] = Form.useForm();
+  const [fieldsModalOpen, setFieldsModalOpen] = useState(false);
+  const [editingFieldsRow, setEditingFieldsRow] = useState<any>(null);
+  const [fieldsForm] = Form.useForm();
+  const [typeOptions, setTypeOptions] = useState<{ value: number; label: string }[]>([]);
+  const [attrList, setAttrList] = useState<any[]>([]);
+  const [attrValues, setAttrValues] = useState<Record<number, { value: number; label: string }[]>>({});
   useEffect(() => { listShops().then(setShops).catch(() => {}); }, []);
   useEffect(() => { getCategories().then(setCategories).catch(() => {}); }, []);
   const load = async () => { if (!taskId) { message.warning("请先输入任务ID"); return; } setRows(await getDrafts(taskId)); };
@@ -55,6 +62,50 @@ export default function ListingReview() {
     load();
   };
 
+  const openFieldsModal = async (row: any) => {
+    setEditingFieldsRow(row);
+    setAttrList([]);
+    fieldsForm.resetFields();
+    fieldsForm.setFieldsValue({
+      type_id: row.type_id, depth: row.depth, width: row.width, height: row.height, weight: row.weight,
+    });
+    const types = await getTypes();
+    const cat = (types as any[]).find((c) => c.category_id === row.category_id);
+    setTypeOptions((cat?.types ?? []).map((t: any) => ({ value: t.type_id, label: t.type_name })));
+    setFieldsModalOpen(true);
+    if (row.type_id) await onTypeChange(row.type_id, row);
+  };
+  const onTypeChange = async (type_id: number, row?: any) => {
+    const r = row ?? editingFieldsRow;
+    if (!r) return;
+    const attrs = await getAttributes(r.category_id, type_id);
+    const required = (attrs as any[]).filter((a) => a.is_required);
+    setAttrList(required);
+    const dictAttrs = required.filter((a) => a.dictionary_id > 0);
+    const entries = await Promise.all(
+      dictAttrs.map(async (a) => [a.id, (await getAttributeValues(r.category_id, type_id, a.id))
+        .map((v: any) => ({ value: v.id, label: v.value }))] as const)
+    );
+    setAttrValues(Object.fromEntries(entries));
+  };
+  const onSaveFields = async () => {
+    if (!editingFieldsRow) return;
+    const values = await fieldsForm.validateFields();
+    const attributes: Record<string, any> = {};
+    for (const a of attrList) {
+      const v = values[`attr_${a.id}`];
+      if (v === undefined) continue;
+      attributes[a.id] = a.dictionary_id > 0 ? { dictionary_value_id: v } : { value: v };
+    }
+    await confirmCreateFields(editingFieldsRow.id, {
+      type_id: values.type_id, depth: values.depth, width: values.width, height: values.height,
+      weight: values.weight, attributes,
+    });
+    message.success("补充信息已保存");
+    setFieldsModalOpen(false);
+    load();
+  };
+
   return (
     <Space direction="vertical" style={{ width: "100%" }} size="large">
       <Card title="上架审核(跟卖草稿)">
@@ -83,6 +134,7 @@ export default function ListingReview() {
             { title: "操作", render: (_, r) => (
                 <Space>
                   {r.mode === "create" && <Button size="small" onClick={() => openCatModal(r)}>类目/属性/图片</Button>}
+                  {r.mode === "create" && <Button size="small" onClick={() => openFieldsModal(r)}>补充信息</Button>}
                   {r.status === "draft" && <Button size="small" onClick={() => onConfirm(r.id)}>确认草稿</Button>}
                 </Space>
               ) },
@@ -113,6 +165,37 @@ export default function ListingReview() {
               </Form.Item>
             </Form>
           </Space>
+        )}
+      </Modal>
+      <Modal title="补充信息(类型/尺寸/属性)" open={fieldsModalOpen} onCancel={() => setFieldsModalOpen(false)}
+        onOk={onSaveFields} okText="保存" cancelText="取消" destroyOnClose>
+        {editingFieldsRow && (
+          <Form form={fieldsForm} layout="vertical">
+            <Form.Item label="类型" name="type_id" rules={[{ required: true, message: "请选择类型" }]}>
+              <Select placeholder="选择类型" options={typeOptions} onChange={(v) => onTypeChange(v)} />
+            </Form.Item>
+            <Space>
+              <Form.Item label="长(mm)" name="depth" rules={[{ required: true, message: "必填" }]}>
+                <InputNumber min={0} />
+              </Form.Item>
+              <Form.Item label="宽(mm)" name="width" rules={[{ required: true, message: "必填" }]}>
+                <InputNumber min={0} />
+              </Form.Item>
+              <Form.Item label="高(mm)" name="height" rules={[{ required: true, message: "必填" }]}>
+                <InputNumber min={0} />
+              </Form.Item>
+              <Form.Item label="重量(g)" name="weight" rules={[{ required: true, message: "必填" }]}>
+                <InputNumber min={0} />
+              </Form.Item>
+            </Space>
+            {attrList.map((a) => (
+              <Form.Item key={a.id} label={a.name} name={`attr_${a.id}`} rules={[{ required: true, message: "必填" }]}>
+                {a.dictionary_id > 0
+                  ? <Select placeholder={`选择${a.name}`} options={attrValues[a.id] ?? []} />
+                  : <Input placeholder={`填写${a.name}`} />}
+              </Form.Item>
+            ))}
+          </Form>
         )}
       </Modal>
     </Space>
