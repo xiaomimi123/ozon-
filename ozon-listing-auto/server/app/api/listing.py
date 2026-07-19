@@ -12,7 +12,7 @@ from app.services.pricing import DEFAULT_PRICING
 from app.services.settings_store import get_category
 from app.services.category_tree import build_category_tree
 from app.workers.publisher import apply_auto_confirm, confirm_draft, run_publish_core
-from app.services.ozon_seller.factory import get_ozon_seller
+from app.services.ozon_seller.resolve import resolve_seller
 
 router = APIRouter(prefix="/listing", tags=["listing"])
 
@@ -74,7 +74,7 @@ async def listing_publish(task_id: int, sync: bool = False, s: AsyncSession = De
     if not t:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "任务不存在")
     if sync:
-        r = await run_publish_core(dbmod.async_session, task_id, seller=get_ozon_seller("mock"))
+        r = await run_publish_core(dbmod.async_session, task_id, seller=await resolve_seller(s))
         return r
     from arq import create_pool
     from arq.connections import RedisSettings
