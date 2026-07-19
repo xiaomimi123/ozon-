@@ -299,7 +299,7 @@ OZON_COOKIE='<浏览器复制的 Cookie 值>' .venv/bin/python -m pytest tests/t
 详细流程与切换步骤见 [`docs/M2-货源匹配说明.md`](docs/M2-货源匹配说明.md)。要点：
 
 - 货源 provider 默认 `mock`，供本地/CI 免外部依赖跑通「建账号 → 采集(M1) → 匹配 → 候选」全链路。
-- 切真实 1688 需在账号池配置可用 cookie，对应 live 冒烟测试 (`server/tests/test_source_live.py`) 默认跳过，需 `pytest -m live` 显式触发。
+- 切真实 1688 需在账号池配置可用 cookie，并在后台「货源配置」页(`/settings/sources`)填图搜端点/签名参数/响应路径（配置驱动，详见「真实 1688 货源说明」）；对应 live 冒烟测试 (`server/tests/test_live_1688.py`) 默认跳过，需 `pytest -m live` 显式触发。
 - 拼多多一期仅完成 JSON 解析层（`parse_pdd_items`），图搜/关键词搜索仍是占位（`NotImplementedError`），真实抓取（`selenium` + 代理截获）留待后续接入，暂无法通过环境变量切换为真实可用状态。
 - CLIP 去重默认 `mock` embedder；切真实 CLIP 需同时设置 `EMBEDDER=clip` 与 `INSTALL_ML=true`（worker 镜像重新构建装 `[ml]` 组）。
 
@@ -391,6 +391,32 @@ OZON_CLIENT_ID=.. OZON_API_KEY=.. OZON_TARGET_SKU=.. \
 ```
 
 三个环境变量任一未设时用例自动 `skip`；用真实/沙箱凭据对 `OZON_TARGET_SKU` 发起一次真实 `create_follow_offer` 调用，断言拿到非空响应（`res.raw is not None`，是否 `ok` 取决于该 SKU 是否可跟卖）；若 `ok` 则继续轮询 `get_product_status`，断言结果落在 `approved`/`pending`/`rejected` 三态之一。
+
+## 真实 1688 货源说明
+
+`Ali1688Provider`（`app/services/sources/ali1688.py`）已改为**配置驱动**：请求端点、方法、额外参数/头、响应解析路径均从后台 `/settings/sources`（admin，前端「货源配置」菜单）读取，不再硬编码；构造时通过 `build_source_provider(session_factory, "ali1688")`（`app/services/sources/factory.py`）注入配置，货源匹配 worker 默认走它。
+
+- `/settings/sources` 6 个字段（均非密钥，明文存储）：
+  - `ali1688_image_search_url` / `ali1688_keyword_search_url`：拍立淘图搜 / 关键词搜索的真实请求地址。
+  - `ali1688_method`：`GET` 或 `POST`。
+  - `ali1688_extra_params` / `ali1688_extra_headers`：JSON 对象字符串，装签名等额外请求参数/请求头（如 `{"sign": "..."}`）。
+  - `ali1688_offer_list_path`：响应 JSON 中候选列表的点路径，默认 `data.offerList`；`parse_offers`（`app/services/sources/parser_ali.py`）按该路径容错解析，取不到或字段缺失的条目会被跳过而非报错。
+- **登录态 cookie 不在这个页面填**：仍在「货源账号池」（`source_accounts`，M2 已建）按账号配置，`Ali1688Provider` 请求时从传入的 `session` 里取 cookie 注入。
+- **诚实边界（务必读完）**：1688 拍立淘图搜是**淘宝系 mtop 签名 API**，请求需要动态签名（`sign`/`t`/`appKey` 等），签名算法本轮**未逆向复现**——过于脆弱、易随 1688 前端版本失效，也涉及 ToS 风险。真实可用的做法：
+  1. 你在浏览器里对 1688 App/网页版拍立淘发起一次真实搜索，用 devtools 抓包拿到当次的真实请求 URL/方法/参数(含 sign)/响应结构；
+  2. 把端点、方法、额外参数（含抓到的签名，注意签名通常有时效，需定期重抓或做成动态获取）、响应取值路径填进 `/settings/sources`；cookie 填进货源账号池；
+  3. 若签名机制太复杂/易失效，可考虑改接**付费聚合数据 API**（如市面上的 1688 数据代理服务）作为替代货源，同样只需改 `/settings/sources` 里的端点与解析路径，`Ali1688Provider` 的请求/解析层无需改代码。
+  - 当前仓库里的占位端点（`s.1688.com/youyuan/index.htm` 等）是**网页搜索页而非 JSON API**，直接填入不会返回可解析的候选列表，仅供说明用途，请务必替换为你抓包拿到的真实接口。
+
+`@live` 真实 1688 图搜冒烟测试（默认跳过，不影响日常回归）：
+
+```bash
+cd server
+ALI1688_URL=.. ALI1688_COOKIE=.. ALI1688_IMG=<商品图URL> \
+  .venv/bin/python -m pytest tests/test_live_1688.py -m live -v
+```
+
+`ALI1688_URL`/`ALI1688_COOKIE`/`ALI1688_IMG` 任一未设时用例自动 `skip`；可选 `ALI1688_METHOD`（默认 `GET`）、`ALI1688_PARAMS`/`ALI1688_HEADERS`（JSON 字符串，默认 `{}`）、`ALI1688_PATH`（默认 `data.offerList`）覆盖对应配置；用真实端点+cookie 发起一次 `Ali1688Provider.image_search`，断言返回值是 `list`（真实响应结构对齐后应有候选，具体条数取决于你的抓包配置是否有效）。
 
 ## 后续里程碑（概览）
 

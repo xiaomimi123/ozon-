@@ -5,7 +5,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from app.core.logging import get_logger
-from app.services.sources.factory import get_source_provider
 from app.services.account_pool import acquire, get_session_credentials, report_risk
 from app.services.candidate_ingest import dedup_and_upsert
 from app.models import CollectTask, OzonProduct
@@ -26,7 +25,6 @@ async def run_match_core(session_factory: async_sessionmaker, task_id: int, *, e
     不同平台但视觉相同的候选才能被聚为同一簇。
     """
     now_fn = now_fn or _default_now
-    provider_factory = provider_factory or get_source_provider
     log = get_logger(task_id=task_id, phase="match")
 
     async with session_factory() as s:
@@ -73,7 +71,11 @@ async def run_match_core(session_factory: async_sessionmaker, task_id: int, *, e
                     platforms_skipped += 1
                     continue
                 session_handle = get_session_credentials(acc)
-                provider = provider_factory(platform)
+                if provider_factory is not None:
+                    provider = provider_factory(platform)
+                else:
+                    from app.services.sources.factory import build_source_provider
+                    provider = await build_source_provider(session_factory, platform)
                 if product.main_image_url:
                     merged += await provider.image_search(product.main_image_url, session=session_handle)
                 if product.title:

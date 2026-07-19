@@ -18,10 +18,32 @@ def _rate(v) -> float | None:
     return round(float(m.group()) / 100, 4) if m else None
 
 
-def parse_image_search(payload: dict) -> list[SupplyCandidateDTO]:
-    """解析 1688 拍立淘图搜（或关键词搜索）返回 JSON，容错缺字段。"""
+def _dig(obj, path: str):
+    cur = obj
+    for part in path.split("."):
+        if isinstance(cur, dict):
+            cur = cur.get(part)
+        elif isinstance(cur, list):
+            try:
+                cur = cur[int(part)]
+            except (ValueError, IndexError):
+                return None
+        else:
+            return None
+        if cur is None:
+            return None
+    return cur
+
+
+def parse_offers(payload: dict, offer_list_path: str = "data.offerList") -> list[SupplyCandidateDTO]:
+    """解析 1688 图搜/关键词搜索返回 JSON，offer 列表所在路径可配置，容错缺字段。"""
     out: list[SupplyCandidateDTO] = []
-    for it in (payload.get("data", {}) or {}).get("offerList", []) or []:
+    if not isinstance(payload, dict):
+        return out
+    offers = _dig(payload, offer_list_path)
+    for it in offers if isinstance(offers, list) else []:
+        if not isinstance(it, dict):
+            continue
         offer_id = it.get("offerId")
         if offer_id is None:
             continue
@@ -40,3 +62,8 @@ def parse_image_search(payload: dict) -> list[SupplyCandidateDTO]:
             supplier_info={k: v for k, v in info.items() if v is not None}, raw=it,
         ))
     return out
+
+
+def parse_image_search(payload: dict) -> list[SupplyCandidateDTO]:
+    """解析 1688 拍立淘图搜（或关键词搜索）返回 JSON，容错缺字段（向后兼容，固定默认路径）。"""
+    return parse_offers(payload, "data.offerList")

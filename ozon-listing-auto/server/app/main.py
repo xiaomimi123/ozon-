@@ -12,6 +12,7 @@ from app.api.imagegen import router as imagegen_router
 from app.api.crawler import router as crawler_router
 from app.api.system import router as system_router
 from app.api.llm import router as llm_router
+from app.api.sources import router as sources_router
 from app.api.settings import router as settings_router
 from app.api.tasks import router as tasks_router
 from app.api.collect import router as collect_router
@@ -54,13 +55,14 @@ app.add_middleware(
     allow_headers=["*"], allow_credentials=False,
 )
 app.include_router(auth_router)
-# imagegen_router(/settings/imagegen)、crawler_router(/settings/crawler)、system_router(/settings/system)
-# 须先于 settings_router(/settings/{category}) 注册：
+# imagegen_router(/settings/imagegen)、crawler_router(/settings/crawler)、system_router(/settings/system)、
+# sources_router(/settings/sources) 须先于 settings_router(/settings/{category}) 注册：
 # Starlette 按注册顺序匹配路由，通配的 {category} 若排在前面会先吞掉这些具体路径。
 app.include_router(imagegen_router)
 app.include_router(crawler_router)
 app.include_router(system_router)
 app.include_router(llm_router)
+app.include_router(sources_router)
 app.include_router(settings_router)
 app.include_router(tasks_router)
 app.include_router(collect_router)

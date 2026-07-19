@@ -13,6 +13,7 @@ import ImagegenSettings from "./pages/settings/ImagegenSettings";
 import CrawlerSettings from "./pages/settings/CrawlerSettings";
 import SystemSettings from "./pages/settings/SystemSettings";
 import LlmSettings from "./pages/settings/LlmSettings";
+import SourcesSettings from "./pages/settings/SourcesSettings";
 
 export default function App() {
   return (
@@ -32,6 +33,7 @@ export default function App() {
           <Route path="/settings/crawler" element={<CrawlerSettings />} />
           <Route path="/settings/system" element={<SystemSettings />} />
           <Route path="/settings/llm" element={<LlmSettings />} />
+          <Route path="/settings/sources" element={<SourcesSettings />} />
         </Route>
         <Route path="*" element={<Navigate to="/tasks" replace />} />
       </Routes>
