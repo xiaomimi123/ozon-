@@ -15,6 +15,15 @@ def _to_ozon_attributes(attrs: dict) -> list:
             for k, v in (attrs or {}).items() if str(k).isdigit()]
 
 
+def _fmt_price(v) -> str:
+    """价格转字符串：整数值去掉 .0（Ozon 期望 "2300" 而非 "2300.0"）。"""
+    try:
+        f = float(v)
+        return str(int(f)) if f.is_integer() else repr(f)
+    except (TypeError, ValueError):
+        return str(v)
+
+
 class RealOzonSeller:
     name = "real"
 
@@ -35,7 +44,7 @@ class RealOzonSeller:
 
     async def create_follow_offer(self, *, client_id, api_key, target_sku, barcode, price, stock, offer_id) -> PublishResult:
         body = {"items": [{"sku": int(target_sku), "offer_id": str(offer_id),
-                           "price": str(price), "currency_code": "RUB"}]}
+                           "price": _fmt_price(price), "currency_code": "RUB"}]}
         try:
             async with self._client() as c:
                 r = await c.post(_IMPORT_BY_SKU, headers=self._headers(client_id, api_key), json=body)
@@ -45,7 +54,11 @@ class RealOzonSeller:
             if result.get("unmatched_sku_list"):
                 return PublishResult(ok=False, ozon_product_id=None, status="failed",
                                      raw=data, error=f"SKU 未匹配/禁止复制: {result['unmatched_sku_list']}")
-            return PublishResult(ok=True, ozon_product_id=str(result.get("task_id")),
+            task_id = result.get("task_id")
+            if task_id is None:
+                return PublishResult(ok=False, ozon_product_id=None, status="failed",
+                                     raw=data, error="Ozon 响应缺 task_id")
+            return PublishResult(ok=True, ozon_product_id=str(task_id),
                                  status="pending_review", raw=data)
         except Exception as exc:  # noqa: BLE001
             return PublishResult(ok=False, ozon_product_id=None, status="failed", error=str(exc) or exc.__class__.__name__)
@@ -55,14 +68,18 @@ class RealOzonSeller:
         # 注意：v3/product/import 真实自建还需 type_id + 尺寸/重量 + 属性字典值 id，草稿暂无 →
         # 缺字段留空, 真实 import 审核会拒, 需后续扩草稿字段/人工补(见文档)。
         item = {"offer_id": str(offer_id), "name": title or "", "description_category_id": category_id,
-                "price": str(price), "currency_code": "RUB", "barcode": barcode or "",
+                "price": _fmt_price(price), "currency_code": "RUB", "barcode": barcode or "",
                 "images": images or [], "attributes": _to_ozon_attributes(attributes)}
         try:
             async with self._client() as c:
                 r = await c.post(_IMPORT_V3, headers=self._headers(client_id, api_key), json={"items": [item]})
                 r.raise_for_status()
                 data = r.json()
-            return PublishResult(ok=True, ozon_product_id=str(data.get("result", {}).get("task_id")),
+            task_id = data.get("result", {}).get("task_id")
+            if task_id is None:
+                return PublishResult(ok=False, ozon_product_id=None, status="failed",
+                                     raw=data, error="Ozon 响应缺 task_id")
+            return PublishResult(ok=True, ozon_product_id=str(task_id),
                                  status="pending_review", raw=data,
                                  error=None)
         except Exception as exc:  # noqa: BLE001

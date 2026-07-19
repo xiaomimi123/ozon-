@@ -1,7 +1,7 @@
 import json
 import pytest
 import httpx
-from app.services.ozon_seller.real import RealOzonSeller, _to_ozon_attributes
+from app.services.ozon_seller.real import RealOzonSeller, _to_ozon_attributes, _fmt_price
 
 
 def _prov(handler):
@@ -71,3 +71,29 @@ def test_to_ozon_attributes():
         {"complex_id": 0, "id": 85, "values": [{"value": "Samsung"}]},
         {"complex_id": 0, "id": 9048, "values": [{"value": "红"}]}]
     assert _to_ozon_attributes({}) == [] and _to_ozon_attributes(None) == []
+
+
+def test_fmt_price():
+    assert _fmt_price(2300.0) == "2300"
+    assert _fmt_price(2300.5) == "2300.5"
+    assert _fmt_price(1000) == "1000"
+
+
+@pytest.mark.asyncio
+async def test_follow_offer_price_is_clean_string():
+    seen = {}
+    def h(req):
+        seen["body"] = json.loads(req.content)
+        return httpx.Response(200, json={"result": {"task_id": 123, "unmatched_sku_list": []}})
+    await _prov(h).create_follow_offer(client_id="c", api_key="k", target_sku="298789742",
+                                       barcode="460", price=2300.0, stock=5, offer_id="A1")
+    assert seen["body"]["items"][0]["price"] == "2300"
+
+
+@pytest.mark.asyncio
+async def test_missing_task_id_fails():
+    def h(req):
+        return httpx.Response(200, json={"result": {}})
+    res = await _prov(h).create_follow_offer(client_id="c", api_key="k", target_sku="298789742",
+                                             barcode="460", price=1.0, stock=1, offer_id="A1")
+    assert not res.ok and res.status == "failed"
