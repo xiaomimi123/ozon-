@@ -14,6 +14,7 @@ import CrawlerSettings from "./pages/settings/CrawlerSettings";
 import SystemSettings from "./pages/settings/SystemSettings";
 import LlmSettings from "./pages/settings/LlmSettings";
 import SourcesSettings from "./pages/settings/SourcesSettings";
+import StaffSettings from "./pages/settings/StaffSettings";
 
 export default function App() {
   return (
@@ -34,6 +35,7 @@ export default function App() {
           <Route path="/settings/system" element={<SystemSettings />} />
           <Route path="/settings/llm" element={<LlmSettings />} />
           <Route path="/settings/sources" element={<SourcesSettings />} />
+          <Route path="/staff" element={<StaffSettings />} />
         </Route>
         <Route path="*" element={<Navigate to="/tasks" replace />} />
       </Routes>
