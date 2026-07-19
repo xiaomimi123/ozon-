@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: ozon
       POSTGRES_PASSWORD: ozon
       POSTGRES_DB: ozon
-    ports: ["5432:5432"]
+    ports: ["${DB_PORT:-5432}:5432"]
     volumes: ["pgdata:/var/lib/postgresql/data"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ozon -d ozon"]
@@ -16,7 +16,7 @@ services:
       retries: 10
   redis:
     image: redis:7-alpine
-    ports: ["6379:6379"]
+    ports: ["${REDIS_PORT:-6379}:6379"]
   api:
     build: ./server
     # db 有 healthcheck 门控，api 会等 Postgres 真正就绪后再启动，避免
@@ -32,7 +32,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
-    ports: ["8000:8000"]
+    ports: ["${API_PORT:-8000}:8000"]
     # M6：改图产物落盘目录，与 worker 共享同一份宿主机目录，保证 sync=true（api 进程内跑）
     # 与 sync=false（worker 异步跑）两条改图路径写入的产物互相可见，容器重建也不丢。
     volumes: ["./server/static:/app/static"]
@@ -58,7 +58,7 @@ services:
     volumes: ["./server/static:/app/static"]
   web:
     build: ./web
-    ports: ["8080:80"]
+    ports: ["${WEB_PORT:-8080}:80"]
     depends_on: [api]
 volumes:
   pgdata:
