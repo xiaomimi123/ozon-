@@ -8,6 +8,8 @@ class ImagegenIn(BaseModel):
     img_api_key: str = ""
     img_model: str = ""
     fallback: str = ""              # 降级顺序，逗号分隔
+    img_request_template: str = ""  # http provider 请求体模板({prompt}/{model} 占位)
+    img_response_path: str = ""     # http provider 响应取图点路径
 
 
 class ImagegenOut(BaseModel):
@@ -16,3 +18,5 @@ class ImagegenOut(BaseModel):
     img_api_key: str | None = None  # 脱敏
     img_model: str = ""
     fallback: str = ""
+    img_request_template: str = ""
+    img_response_path: str = ""

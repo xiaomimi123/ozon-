@@ -16,7 +16,9 @@ async def read(s: AsyncSession = Depends(get_session), _: User = Depends(require
     masked = await store.get_category_masked(s, _CAT)
     return ImagegenOut(provider=masked.get("provider", "mock"), img_base_url=masked.get("img_base_url", ""),
                        img_api_key=masked.get("img_api_key"), img_model=masked.get("img_model", ""),
-                       fallback=masked.get("fallback", ""))
+                       fallback=masked.get("fallback", ""),
+                       img_request_template=masked.get("img_request_template", ""),
+                       img_response_path=masked.get("img_response_path", ""))
 
 
 @router.put("", response_model=ImagegenOut)
@@ -30,6 +32,10 @@ async def write(body: ImagegenIn, s: AsyncSession = Depends(get_session),
         await store.set_value(s, _CAT, "img_api_key", body.img_api_key, is_secret=True, updated_by=u.id)
     await store.set_value(s, _CAT, "img_model", body.img_model, is_secret=False, updated_by=u.id)
     await store.set_value(s, _CAT, "fallback", body.fallback, is_secret=False, updated_by=u.id)
+    await store.set_value(s, _CAT, "img_request_template", body.img_request_template, is_secret=False, updated_by=u.id)
+    await store.set_value(s, _CAT, "img_response_path", body.img_response_path, is_secret=False, updated_by=u.id)
     await s.commit()
     return ImagegenOut(provider=body.provider, img_base_url=body.img_base_url, img_api_key="***",
-                       img_model=body.img_model, fallback=body.fallback)
+                       img_model=body.img_model, fallback=body.fallback,
+                       img_request_template=body.img_request_template,
+                       img_response_path=body.img_response_path)
