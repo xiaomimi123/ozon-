@@ -50,7 +50,7 @@ async def test_ali1688_image_search_uses_config(db_session):
     prov = Ali1688Provider(conf, transport=httpx.MockTransport(h))
     out = await prov.image_search("http://img/a.jpg", session={"cookie": "sess=1"})
     assert "h5.1688.com/img" in seen["url"] and "sign=S" in seen["url"] and "imageAddress" in seen["url"]
-    assert seen["cookie"] and len(out) == 1 and out[0].offer_id == "12" and out[0].price == 9.9
+    assert seen["cookie"] == "sess=1" and len(out) == 1 and out[0].offer_id == "12" and out[0].price == 9.9
 
 
 def test_parse_offers_configurable_path_and_tolerant():

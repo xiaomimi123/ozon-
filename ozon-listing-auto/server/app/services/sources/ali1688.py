@@ -19,11 +19,11 @@ class Ali1688Provider:
         """按传入 session（含登录态 cookie）+ 配置的额外头构造 httpx 客户端。"""
         cookies = (session or {}).get("cookie") if isinstance(session, dict) else None
         headers = {"User-Agent": "Mozilla/5.0", **(self._conf.get("ali1688_extra_headers") or {})}
+        if cookies:
+            headers["Cookie"] = cookies
         kw = {"timeout": self._timeout, "headers": headers}
         if self._transport is not None:
             kw["transport"] = self._transport
-        if cookies:
-            kw["cookies"] = {"cookie2": cookies}
         return httpx.AsyncClient(**kw)
 
     async def _search(self, url: str, base_params: dict, session) -> list[SupplyCandidateDTO]:
