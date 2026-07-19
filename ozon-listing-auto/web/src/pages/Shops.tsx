@@ -23,7 +23,7 @@ export default function Shops() {
         </Form>
       </Card>
       <Card title="店铺列表">
-        <Table rowKey="id" dataSource={rows} pagination={false}
+        <Table rowKey="id" dataSource={rows} pagination={false} scroll={{ x: "max-content" }}
           columns={[
             { title: "名称", dataIndex: "name" }, { title: "Client-Id", dataIndex: "client_id" },
             { title: "沙箱", dataIndex: "is_sandbox", render: (b) => (b ? "是" : "否") },

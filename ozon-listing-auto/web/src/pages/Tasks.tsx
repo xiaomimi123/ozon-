@@ -71,7 +71,7 @@ export default function Tasks() {
         </Form>
       </Card>
       <Card title="任务列表">
-        <Table rowKey="id" dataSource={rows} pagination={false}
+        <Table rowKey="id" dataSource={rows} pagination={false} scroll={{ x: "max-content" }}
           columns={[
             { title: "ID", dataIndex: "id" }, { title: "名称", dataIndex: "name" },
             { title: "模式", dataIndex: "listing_mode", render: (v) => <Tag color={v === "follow" ? "blue" : "green"}>{v === "follow" ? "跟卖" : "自建"}</Tag> },

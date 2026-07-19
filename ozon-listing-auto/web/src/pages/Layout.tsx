@@ -1,5 +1,6 @@
-import { Layout as AntLayout, Menu, Button } from "antd";
-import { Outlet, useNavigate, Navigate } from "react-router-dom";
+import { useState } from "react";
+import { Layout as AntLayout, Menu, Button, Drawer, Grid } from "antd";
+import { Outlet, useNavigate, useLocation, Navigate } from "react-router-dom";
 import { auth } from "../store/auth";
 import { APP_NAME, LOGO } from "../brand";
 
@@ -22,26 +23,59 @@ const menuItems: { key: string; label: string; adminOnly?: boolean }[] = [
 
 export default function Layout() {
   const nav = useNavigate();
+  const loc = useLocation();
+  const screens = Grid.useBreakpoint();
+  const isMobile = !screens.md;
+  const [drawerOpen, setDrawerOpen] = useState(false);
   if (!auth.token) return <Navigate to="/login" replace />;
   const role = auth.role;
   const items = menuItems.filter((i) => !i.adminOnly || role === "admin");
+  const selectedKey = loc.pathname.replace(/^\//, "") || "tasks";
   const onLogout = () => { auth.clear(); nav("/login"); };
+
+  const BrandHead = (
+    <div style={{ color: "#fff", padding: 16, display: "flex", alignItems: "center", gap: 8 }}>
+      <img src={LOGO} alt="logo" style={{ width: 28, height: 28, borderRadius: 6, background: "#fff" }} />
+      <span style={{ fontWeight: 600 }}>{APP_NAME}</span>
+    </div>
+  );
+
+  // 侧栏/抽屉共用的导航内容
+  const NavBody = (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      {BrandHead}
+      <Menu theme="dark" mode="inline" selectedKeys={[selectedKey]} style={{ flex: 1, borderInlineEnd: 0 }}
+        onClick={(e) => { nav(`/${e.key}`); setDrawerOpen(false); }}
+        items={items} />
+      <div style={{ padding: 16 }}>
+        <Button type="text" onClick={onLogout} style={{ color: "rgba(255,255,255,.85)", width: "100%", textAlign: "left" }}>
+          退出登录
+        </Button>
+      </div>
+    </div>
+  );
+
+  if (isMobile) {
+    return (
+      <AntLayout style={{ minHeight: "100vh" }}>
+        <AntLayout.Header style={{ display: "flex", alignItems: "center", gap: 12, padding: "0 16px", background: "#001529" }}>
+          <Button type="text" onClick={() => setDrawerOpen(true)}
+            style={{ color: "#fff", fontSize: 20, lineHeight: 1 }} aria-label="菜单">☰</Button>
+          <img src={LOGO} alt="logo" style={{ width: 24, height: 24, borderRadius: 6, background: "#fff" }} />
+          <span style={{ color: "#fff", fontWeight: 600 }}>{APP_NAME}</span>
+        </AntLayout.Header>
+        <Drawer placement="left" open={drawerOpen} onClose={() => setDrawerOpen(false)}
+          width={220} styles={{ body: { padding: 0, background: "#001529" }, header: { display: "none" } }}>
+          {NavBody}
+        </Drawer>
+        <AntLayout.Content style={{ padding: 16, overflowX: "auto" }}><Outlet /></AntLayout.Content>
+      </AntLayout>
+    );
+  }
+
   return (
     <AntLayout style={{ minHeight: "100vh" }}>
-      <AntLayout.Sider>
-        <div style={{ color: "#fff", padding: 16, display: "flex", alignItems: "center", gap: 8 }}>
-          <img src={LOGO} alt="logo" style={{ width: 28, height: 28, borderRadius: 6, background: "#fff" }} />
-          <span style={{ fontWeight: 600 }}>{APP_NAME}</span>
-        </div>
-        <Menu theme="dark" mode="inline" defaultSelectedKeys={["tasks"]}
-          onClick={(e) => nav(`/${e.key}`)}
-          items={items} />
-        <div style={{ padding: 16 }}>
-          <Button type="text" onClick={onLogout} style={{ color: "rgba(255,255,255,.85)", width: "100%", textAlign: "left" }}>
-            退出登录
-          </Button>
-        </div>
-      </AntLayout.Sider>
+      <AntLayout.Sider>{NavBody}</AntLayout.Sider>
       <AntLayout>
         <AntLayout.Content style={{ padding: 24 }}><Outlet /></AntLayout.Content>
       </AntLayout>

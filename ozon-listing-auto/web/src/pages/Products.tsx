@@ -42,7 +42,7 @@ export default function Products() {
         </Form>
       </Card>
       <Card title={`商品列表（共 ${data.total} 条）`}>
-        <Table rowKey="id" dataSource={data.items}
+        <Table rowKey="id" dataSource={data.items} scroll={{ x: "max-content" }}
           pagination={{ current: page, total: data.total, pageSize: 20, onChange: (p) => query(p) }}
           columns={[
             { title: "图", dataIndex: "main_image_url", render: (u) => u ? <Image src={u} width={48} /> : "-" },

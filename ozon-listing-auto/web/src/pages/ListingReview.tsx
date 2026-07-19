@@ -69,7 +69,7 @@ export default function ListingReview() {
         </Space>
       </Card>
       <Card title="草稿列表">
-        <Table rowKey="id" dataSource={rows} pagination={false}
+        <Table rowKey="id" dataSource={rows} pagination={false} scroll={{ x: "max-content" }}
           columns={[
             { title: "模式", dataIndex: "mode", render: (m) => <Tag>{m === "create" ? "自建" : "跟卖"}</Tag> },
             { title: "标题", dataIndex: "title", render: (t) => t ?? "-" },

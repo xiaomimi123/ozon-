@@ -106,21 +106,30 @@ export default function StaffSettings() {
           rowKey="id"
           dataSource={rows}
           pagination={false}
+          scroll={{ x: "max-content" }}
           columns={[
-            { title: "用户名", dataIndex: "username" },
+            { title: "用户名", dataIndex: "username", width: 100 },
             {
               title: "角色",
               dataIndex: "role",
+              width: 80,
               render: (role) => <Tag color={ROLE_COLOR[role]}>{ROLE_LABEL[role] || role}</Tag>,
             },
             {
               title: "状态",
               dataIndex: "is_active",
+              width: 80,
               render: (active) => <Tag color={active ? "success" : "default"}>{active ? "启用" : "停用"}</Tag>,
             },
-            { title: "创建时间", dataIndex: "created_at" },
+            {
+              title: "创建时间",
+              dataIndex: "created_at",
+              width: 170,
+              render: (v) => (v ? String(v).replace("T", " ").slice(0, 19) : "-"),
+            },
             {
               title: "操作",
+              width: 340,
               render: (_, r) => (
                 <Space>
                   <Select
