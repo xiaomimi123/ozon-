@@ -15,13 +15,16 @@ _CAT = "system"
 async def read(s: AsyncSession = Depends(get_session), _: User = Depends(require_role("admin"))):
     m = await store.get_category(s, _CAT)
     return SystemOut(ozon_seller_provider=m.get("ozon_seller_provider", "mock"),
-                     category_tree_provider=m.get("category_tree_provider", "mock"))
+                     category_tree_provider=m.get("category_tree_provider", "mock"),
+                     ozon_publish_dry_run=m.get("ozon_publish_dry_run", "true"))
 
 
 @router.put("", response_model=SystemOut)
 async def write(body: SystemIn, s: AsyncSession = Depends(get_session), u: User = Depends(require_role("admin"))):
     await store.set_value(s, _CAT, "ozon_seller_provider", body.ozon_seller_provider, is_secret=False, updated_by=u.id)
     await store.set_value(s, _CAT, "category_tree_provider", body.category_tree_provider, is_secret=False, updated_by=u.id)
+    await store.set_value(s, _CAT, "ozon_publish_dry_run", body.ozon_publish_dry_run, is_secret=False, updated_by=u.id)
     await s.commit()
     return SystemOut(ozon_seller_provider=body.ozon_seller_provider,
-                     category_tree_provider=body.category_tree_provider)
+                     category_tree_provider=body.category_tree_provider,
+                     ozon_publish_dry_run=body.ozon_publish_dry_run)

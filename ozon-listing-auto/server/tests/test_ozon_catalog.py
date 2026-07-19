@@ -1,4 +1,4 @@
-import json, httpx, pytest
+import httpx, pytest
 from app.services.ozon_seller.catalog import OzonCatalog
 
 def _transport(expect_path, reply):
