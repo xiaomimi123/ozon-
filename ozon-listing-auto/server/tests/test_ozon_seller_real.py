@@ -97,3 +97,27 @@ async def test_missing_task_id_fails():
     res = await _prov(h).create_follow_offer(client_id="c", api_key="k", target_sku="298789742",
                                              barcode="460", price=1.0, stock=1, offer_id="A1")
     assert not res.ok and res.status == "failed"
+
+
+def _boom_transport():
+    def handler(request):  # 任何真实请求都视为错误
+        raise AssertionError(f"dry-run 不应发起网络: {request.url}")
+    return httpx.MockTransport(handler)
+
+
+@pytest.mark.asyncio
+async def test_follow_dry_run_builds_body_without_post():
+    s = RealOzonSeller(transport=_boom_transport(), dry_run=True)
+    r = await s.create_follow_offer(client_id="c", api_key="k", target_sku="123",
+                                    barcode="b", price=2300.0, stock=5, offer_id="OF1")
+    assert r.ok and r.status == "pending_review" and r.ozon_product_id == "DRYRUN"
+    body = r.raw["dry_run"]
+    assert body["items"][0]["sku"] == 123
+    assert body["items"][0]["price"] == "2300"
+    assert body["items"][0]["offer_id"] == "OF1"
+
+
+@pytest.mark.asyncio
+async def test_status_dry_run_is_approved():
+    s = RealOzonSeller(transport=_boom_transport(), dry_run=True)
+    assert await s.get_product_status(client_id="c", api_key="k", ozon_product_id="DRYRUN") == "approved"

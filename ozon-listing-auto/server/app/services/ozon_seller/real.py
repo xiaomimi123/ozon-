@@ -27,9 +27,10 @@ def _fmt_price(v) -> str:
 class RealOzonSeller:
     name = "real"
 
-    def __init__(self, timeout: float = 30.0, transport=None):
+    def __init__(self, timeout: float = 30.0, transport=None, dry_run: bool = False):
         self._timeout = timeout
         self._transport = transport
+        self._dry_run = dry_run
 
     def _client(self):
         import httpx
@@ -45,6 +46,8 @@ class RealOzonSeller:
     async def create_follow_offer(self, *, client_id, api_key, target_sku, barcode, price, stock, offer_id) -> PublishResult:
         body = {"items": [{"sku": int(target_sku), "offer_id": str(offer_id),
                            "price": _fmt_price(price), "currency_code": "RUB"}]}
+        if self._dry_run:
+            return PublishResult(ok=True, ozon_product_id="DRYRUN", status="pending_review", raw={"dry_run": body})
         try:
             async with self._client() as c:
                 r = await c.post(_IMPORT_BY_SKU, headers=self._headers(client_id, api_key), json=body)
@@ -70,6 +73,9 @@ class RealOzonSeller:
         item = {"offer_id": str(offer_id), "name": title or "", "description_category_id": category_id,
                 "price": _fmt_price(price), "currency_code": "RUB", "barcode": barcode or "",
                 "images": images or [], "attributes": _to_ozon_attributes(attributes)}
+        if self._dry_run:
+            return PublishResult(ok=True, ozon_product_id="DRYRUN", status="pending_review",
+                                 raw={"dry_run": {"items": [item]}})
         try:
             async with self._client() as c:
                 r = await c.post(_IMPORT_V3, headers=self._headers(client_id, api_key), json={"items": [item]})
@@ -87,6 +93,8 @@ class RealOzonSeller:
 
     async def get_product_status(self, *, client_id, api_key, ozon_product_id) -> str:
         # ozon_product_id 实为 create 返回的 import task_id；轮询 import/info 映射状态。
+        if self._dry_run:
+            return "approved"
         try:
             task_id = int(ozon_product_id)
         except (TypeError, ValueError):
