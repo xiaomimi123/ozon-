@@ -299,7 +299,7 @@ OZON_COOKIE='<浏览器复制的 Cookie 值>' .venv/bin/python -m pytest tests/t
 详细流程与切换步骤见 [`docs/M2-货源匹配说明.md`](docs/M2-货源匹配说明.md)。要点：
 
 - 货源 provider 默认 `mock`，供本地/CI 免外部依赖跑通「建账号 → 采集(M1) → 匹配 → 候选」全链路。
-- 切真实 1688 需在账号池配置可用 cookie，对应 live 冒烟测试 (`server/tests/test_source_live.py`) 默认跳过，需 `pytest -m live` 显式触发。
+- 切真实 1688 需在账号池配置可用 cookie，并在后台「货源配置」页(`/settings/sources`)填图搜端点/签名参数/响应路径（配置驱动，详见「真实 1688 货源说明」）；对应 live 冒烟测试 (`server/tests/test_live_1688.py`) 默认跳过，需 `pytest -m live` 显式触发。
 - 拼多多一期仅完成 JSON 解析层（`parse_pdd_items`），图搜/关键词搜索仍是占位（`NotImplementedError`），真实抓取（`selenium` + 代理截获）留待后续接入，暂无法通过环境变量切换为真实可用状态。
 - CLIP 去重默认 `mock` embedder；切真实 CLIP 需同时设置 `EMBEDDER=clip` 与 `INSTALL_ML=true`（worker 镜像重新构建装 `[ml]` 组）。
 
