@@ -92,7 +92,7 @@
 
 ---
 
-## 5. 子项 E — RealOzonSeller 端点校正（跟卖 / 自建 / 状态）· 最硬
+## 5. 子项 E — RealOzonSeller 端点校正（跟卖 / 自建 / 状态）✅ 已完成（端点对齐 + @live，自建数据缺口已标注）
 
 **目标**：真实上架——跟卖 `create_follow_offer`、自建 `create_product`、审核轮询 `get_product_status` 对接真实 Ozon Seller API。
 
@@ -147,7 +147,7 @@
 | B 类目树 ✅ 已完成 | RealCategoryTree+**实抓对齐**+@live+文档 | 提供 cookie，跑 @live | ✅ 是 |
 | C 生图 ✅ 已完成 | 两 provider 请求/响应层+字段映射+配置接线+前端+@live+文档 | 提供服务+key(+HTTP 样例)，跑 @live | ✅ 是（HttpImageProvider 需你样例） |
 | D CLIP ✅ 已完成 | 冒烟+文档+构建路径验证 | 服务器装 [ml] 重建 worker，跑向量冒烟 | ✅ 是（重跑在你环境） |
-| E Ozon Seller | **联网查文档对齐**端点/请求体+@live+文档 | 沙箱凭据跑 @live，按报错迭代 | ⚠️ 尽力，需你沙箱迭代 |
+| E Ozon Seller ✅ 已完成 | 端点/请求体对齐(import-by-sku/v3 import/import-info)+@live+文档(含自建数据缺口标注) | 沙箱凭据跑 @live，按报错迭代 | ✅ 端点已对齐，自建数据缺口需你后续迭代 |
 | F1 1688 | endpoint 校验+账号池接入+@live+文档 | 提供 1688 cookie，跑 @live | ⚠️ 尽力，需你 cookie |
 | F2 拼多多 | （后续独立子项目） | selenium/代理基建 | ❌ 本轮不做 |
 
