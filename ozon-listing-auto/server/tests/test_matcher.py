@@ -90,3 +90,47 @@ async def test_run_match_platform_failure_isolated(engine):
     assert task.match_status == "done"                     # 单平台故障不中断主流程(降级)
     assert {r.platform for r in rows} == {"ali1688"}       # 仅 1688 候选
     assert pdd_acc.status == "cooldown"                    # 风控换号: report_risk 生效
+
+
+class _FakeDefaultProvider:
+    """build_source_provider 默认路径下返回的假 provider：按平台带回极小候选集。"""
+    def __init__(self, platform):
+        self.platform = platform
+
+    async def image_search(self, *a, **k):
+        from app.services.sources.base import SupplyCandidateDTO
+        return [SupplyCandidateDTO(platform=self.platform, offer_id=f"{self.platform}-1",
+                                   title="x", image_url=f"https://img/{self.platform}-1.jpg")]
+
+    async def keyword_search(self, *a, **k):
+        return []
+
+    async def fetch_detail(self, *a, **k):
+        return None
+
+
+@pytest.mark.asyncio
+async def test_run_match_default_path_uses_build_source_provider(engine, monkeypatch):
+    """provider_factory=None(默认路径)：应经 app.services.sources.factory.build_source_provider
+    按平台构造真实/配置驱动 provider，而非测试专用的 mock 工厂——这是生产/ARQ 实际会走的分支。"""
+    sm = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+    tid = await _seed(sm, n_products=1)
+
+    calls: list[str] = []
+
+    async def fake_build_source_provider(session_factory, platform):
+        calls.append(platform)
+        return _FakeDefaultProvider(platform)
+
+    import app.services.sources.factory as factory_mod
+    monkeypatch.setattr(factory_mod, "build_source_provider", fake_build_source_provider)
+
+    result = await run_match_core(sm, tid, embedder=MockEmbedder(), now_fn=_now, provider_factory=None)
+
+    async with sm() as s:
+        task = (await s.execute(select(CollectTask).where(CollectTask.id == tid))).scalar_one()
+        rows = (await s.execute(select(SupplyCandidate).where(SupplyCandidate.task_id == tid))).scalars().all()
+    assert set(calls) == {"ali1688", "pinduoduo"}           # 默认分支确实经 build_source_provider 按平台构造
+    assert task.match_status == "done"
+    assert result["products"] == 1
+    assert {r.platform for r in rows} == {"ali1688", "pinduoduo"}

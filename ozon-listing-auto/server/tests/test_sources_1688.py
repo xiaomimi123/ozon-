@@ -28,10 +28,11 @@ async def test_get_source_conf_parses_json(db_session):
     conf = await get_source_conf(db_session)
     assert conf["ali1688_offer_list_path"] == DEFAULT_SOURCE_CONF["ali1688_offer_list_path"]
     await set_value(db_session, "sources", "ali1688_extra_params", '{"sign":"abc"}', is_secret=False)
-    await set_value(db_session, "sources", "ali1688_extra_params_bad", "not-json", is_secret=False)
+    await set_value(db_session, "sources", "ali1688_extra_headers", "not-json", is_secret=False)
     await db_session.commit()
     conf2 = await get_source_conf(db_session)
     assert conf2["ali1688_extra_params"] == {"sign": "abc"}   # JSON 串→dict
+    assert conf2["ali1688_extra_headers"] == {}               # 坏 JSON→回退默认值,不崩溃
 
 
 @pytest.mark.asyncio
