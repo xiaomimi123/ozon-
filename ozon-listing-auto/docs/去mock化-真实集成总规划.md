@@ -119,8 +119,10 @@
 **现状**：`Ali1688Provider.image_search` 有 httpx+cookie 实现（拍立淘图搜）；账号池 `source_accounts`+`account_pool`(限速/冷却/换号) 已建(M2)；matcher 已接 `get_source_provider` + `acquire`。**拼多多** `PinduoduoProvider` 两方法都 `NotImplementedError`（图搜需签名、关键词需 selenium+代理）。
 
 **要建（分两段，拼多多后置）**：
-- **F1 · 1688 真实化**：校验/对齐 1688 拍立淘图搜 endpoint + 请求体 + cookie 会话（账号池已就绪）；解析真实响应；@live（你提供 1688 cookie）。**能相对完整交付。**
+- **F1 · 1688 真实化** ✅ 已完成（配置驱动 Ali1688Provider + `/settings/sources` 前端 + @live + 文档）：`Ali1688Provider` 改为配置驱动——端点/方法/额外参数·头/响应解析路径均从 `/settings/sources`（admin，前端「货源配置」菜单）读取，`build_source_provider` 注入配置，matcher 默认走它；cookie 仍在货源账号池填。**诚实边界**：拍立淘图搜的 mtop 签名算法本轮未逆向复现，真实端点/签名参数需你抓包填入配置，签名过于脆弱时可换付费聚合 API 备选（详见 README「真实 1688 货源说明」）。
 - **F2 · 拼多多（后置单列）**：图搜签名逆向 / 关键词 selenium+代理**重基建**——单独一个子项目，需专门环境；本轮先不做，标为后续。
+
+> 去 mock 化六项子项目中 A/B/C/D/E/F1 均已完成，仅 F2（拼多多）按计划后置为独立子项目。
 
 **依赖你**：1688 有效 cookie（填账号池）；拼多多需 selenium/代理基建（后续）。
 
@@ -148,7 +150,7 @@
 | C 生图 ✅ 已完成 | 两 provider 请求/响应层+字段映射+配置接线+前端+@live+文档 | 提供服务+key(+HTTP 样例)，跑 @live | ✅ 是（HttpImageProvider 需你样例） |
 | D CLIP ✅ 已完成 | 冒烟+文档+构建路径验证 | 服务器装 [ml] 重建 worker，跑向量冒烟 | ✅ 是（重跑在你环境） |
 | E Ozon Seller ✅ 已完成 | 端点/请求体对齐(import-by-sku/v3 import/import-info)+@live+文档(含自建数据缺口标注) | 沙箱凭据跑 @live，按报错迭代 | ✅ 端点已对齐，自建数据缺口需你后续迭代 |
-| F1 1688 | endpoint 校验+账号池接入+@live+文档 | 提供 1688 cookie，跑 @live | ⚠️ 尽力，需你 cookie |
+| F1 1688 ✅ 已完成 | 配置驱动 Provider+`/settings/sources`前端+账号池接入+@live+文档(签名不复现已标注) | 抓包填真实端点/签名参数，货源账号池填 cookie，跑 @live | ⚠️ 配置/请求/解析层已就绪，真实签名需你抓包填 |
 | F2 拼多多 | （后续独立子项目） | selenium/代理基建 | ❌ 本轮不做 |
 
 ---
