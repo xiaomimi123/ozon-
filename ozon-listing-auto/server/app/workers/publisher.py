@@ -29,8 +29,11 @@ async def apply_auto_confirm(session: AsyncSession, task_id: int) -> dict:
 
 async def confirm_draft(session: AsyncSession, draft_id: int) -> dict:
     d = (await session.execute(select(ListingDraft).where(ListingDraft.id == draft_id))).scalar_one()
-    if d.mode == "create" and (d.category_id is None or not d.images):
-        return {"draft_id": draft_id, "status": d.status, "error": "自建草稿需先确认类目与图片再确认上架"}
+    if d.mode == "create":
+        if d.category_id is None or not d.images:
+            return {"draft_id": draft_id, "status": d.status, "error": "自建草稿需先确认类目与图片再确认上架"}
+        if d.type_id is None or None in (d.depth, d.width, d.height, d.weight):
+            return {"draft_id": draft_id, "status": d.status, "error": "自建缺类型或尺寸/重量, 请先补充"}
     if d.status in ("draft",):
         d.status = "confirmed"
     return {"draft_id": draft_id, "status": d.status}
