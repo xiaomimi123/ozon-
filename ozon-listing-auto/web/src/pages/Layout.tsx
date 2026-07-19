@@ -17,6 +17,7 @@ const menuItems: { key: string; label: string; adminOnly?: boolean }[] = [
   { key: "settings/crawler", label: "爬虫配置", adminOnly: true },
   { key: "settings/llm", label: "LLM 配置", adminOnly: true },
   { key: "settings/sources", label: "货源配置", adminOnly: true },
+  { key: "source-accounts", label: "货源账号", adminOnly: true },
   { key: "settings/system", label: "系统设置", adminOnly: true },
   { key: "staff", label: "员工管理", adminOnly: true },
 ];
