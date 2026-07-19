@@ -2,7 +2,15 @@ import { useEffect } from "react";
 import { Card, Form, Input, Select, Button, message, Typography } from "antd";
 import { getImagegen, putImagegen } from "../../api/imagegen";
 
-const DEFAULTS = { provider: "mock", img_base_url: "", img_api_key: "", img_model: "", fallback: "" };
+const DEFAULTS = {
+  provider: "mock",
+  img_base_url: "",
+  img_api_key: "",
+  img_model: "",
+  fallback: "",
+  img_request_template: "",
+  img_response_path: "",
+};
 
 export default function ImagegenSettings() {
   const [form] = Form.useForm();
@@ -47,6 +55,20 @@ export default function ImagegenSettings() {
         </Form.Item>
         <Form.Item name="fallback" label="降级顺序" extra="逗号分隔，例如 local,mock">
           <Input placeholder="local,mock" />
+        </Form.Item>
+        <Form.Item
+          name="img_request_template"
+          label="请求体模板"
+          extra="仅 http provider 用：请求体 JSON 模板(含 {prompt}/{model})"
+        >
+          <Input.TextArea placeholder='{"prompt": "{prompt}", "model": "{model}"}' rows={3} />
+        </Form.Item>
+        <Form.Item
+          name="img_response_path"
+          label="响应取图点路径"
+          extra="仅 http provider 用：响应取图点路径(如 data.0.url)"
+        >
+          <Input placeholder="data.0.url" />
         </Form.Item>
         <Form.Item>
           <Button type="primary" htmlType="submit">保存</Button>

@@ -14,7 +14,8 @@ def _default_fetch(url: str) -> bytes:
 
 
 async def run_image_process_core(session_factory: async_sessionmaker, task_id: int, *, ops=None,
-                                 static_dir: str | None = None, gen_provider: str = "mock", fetch=None) -> dict:
+                                 static_dir: str | None = None, gen_provider: str = "mock",
+                                 gen_provider_obj=None, fetch=None) -> dict:
     log = get_logger(task_id=task_id, phase="imager")
     ops = ops or DEFAULT_OPS
     static_dir = static_dir or DEFAULT_STATIC_DIR
@@ -34,7 +35,8 @@ async def run_image_process_core(session_factory: async_sessionmaker, task_id: i
                 s.add(row); await s.flush()
                 try:
                     img_bytes = fetch(src)
-                    res = await process_op(op, image=img_bytes, params={}, static_dir=static_dir, gen_provider=gen_provider)
+                    res = await process_op(op, image=img_bytes, params={}, static_dir=static_dir,
+                                           gen_provider=gen_provider, gen_provider_obj=gen_provider_obj)
                     row.result_url = res.url; row.provider = res.provider; row.meta = res.meta; row.status = "done"
                     processed += 1
                 except Exception as exc:  # noqa: BLE001
@@ -47,6 +49,11 @@ async def run_image_process_core(session_factory: async_sessionmaker, task_id: i
 
 
 async def run_image_process(ctx, task_id: int) -> dict:
-    """ARQ 入口：真实 worker 路径，用默认 fetch(httpx 下载源图) + 默认 static_dir + mock gen provider。"""
+    """ARQ 入口：真实 worker 路径，用默认 fetch(httpx 下载源图) + 默认 static_dir +
+    按 /settings/imagegen 配置构造的 gen provider（无配置/无 key 时回退 mock）。"""
     from app.core.db import async_session
-    return await run_image_process_core(async_session, task_id)
+    from app.services.imagegen.factory import DEFAULT_STATIC_DIR
+    from app.services.imagegen.config import get_configured_gen_provider
+    async with async_session() as s:
+        gen_obj = await get_configured_gen_provider(s, static_dir=DEFAULT_STATIC_DIR)
+    return await run_image_process_core(async_session, task_id, gen_provider_obj=gen_obj)
