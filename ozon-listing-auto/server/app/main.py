@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.api.auth import router as auth_router
+from app.api.users import router as users_router
 from app.api.imagegen import router as imagegen_router
 from app.api.crawler import router as crawler_router
 from app.api.system import router as system_router
@@ -55,6 +56,7 @@ app.add_middleware(
     allow_headers=["*"], allow_credentials=False,
 )
 app.include_router(auth_router)
+app.include_router(users_router)
 # imagegen_router(/settings/imagegen)、crawler_router(/settings/crawler)、system_router(/settings/system)、
 # sources_router(/settings/sources) 须先于 settings_router(/settings/{category}) 注册：
 # Starlette 按注册顺序匹配路由，通配的 {category} 若排在前面会先吞掉这些具体路径。
