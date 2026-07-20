@@ -6,10 +6,15 @@ vi.mock("../api/importer", () => ({
       shop_name: "甲店", detail_url: "d", sales: 300, created_at: "2026-07-20T10:00:00Z" },
   ])),
   listCaptures: vi.fn(() => Promise.resolve([])), getCapture: vi.fn(),
+  uploadExcel: vi.fn(),
 }));
 import ImportedProducts from "./ImportedProducts";
 test("渲染导入商品表格", async () => {
   render(<ImportedProducts />);
   expect(await screen.findByText("连衣裙")).toBeInTheDocument();
   expect(await screen.findByText("甲店")).toBeInTheDocument();
+});
+test("显示上传 Excel 按钮", async () => {
+  render(<ImportedProducts />);
+  expect(await screen.findByText(/上传 Excel/)).toBeInTheDocument();
 });
