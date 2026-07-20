@@ -11,6 +11,7 @@ from app.models.listing_draft import ListingDraft
 from app.models.publish_pace import PublishPace
 from app.models.product_image import ProductImage
 from app.models.category_map import CategoryMap
+from app.models.importer import ImportCapture, ImportedProduct
 
 __all__ = [
     "User",
@@ -26,4 +27,6 @@ __all__ = [
     "PublishPace",
     "ProductImage",
     "CategoryMap",
+    "ImportCapture",
+    "ImportedProduct",
 ]
