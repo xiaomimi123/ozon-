@@ -1,5 +1,6 @@
 import { Card, Form, InputNumber, Select, Input, Button, message, Typography } from "antd";
 import { savePricing, PricingParams } from "../api/pricing";
+import AdvancedSection from "../components/AdvancedSection";
 
 const DEFAULTS: PricingParams = {
   mode: "builtin",
@@ -55,12 +56,14 @@ export default function PricingSettings() {
         <Form.Item name="logistics" label="物流费" rules={[{ required: true }]}>
           <InputNumber style={{ width: "100%" }} step={0.1} min={0} />
         </Form.Item>
-        <Form.Item name="min_price" label="最低售价" rules={[{ required: true }]}>
-          <InputNumber style={{ width: "100%" }} step={0.1} min={0} />
-        </Form.Item>
-        <Form.Item name="strike_coeff" label="划线价系数" rules={[{ required: true }]}>
-          <InputNumber style={{ width: "100%" }} step={0.01} min={0} />
-        </Form.Item>
+        <AdvancedSection>
+          <Form.Item name="min_price" label="最低售价" rules={[{ required: true }]} extra="低于此价不上架（保护下限）">
+            <InputNumber style={{ width: "100%" }} step={0.1} min={0} />
+          </Form.Item>
+          <Form.Item name="strike_coeff" label="划线价系数" rules={[{ required: true }]} extra="划线价=售价×系数，用于展示折扣">
+            <InputNumber style={{ width: "100%" }} step={0.01} min={0} />
+          </Form.Item>
+        </AdvancedSection>
         <Form.Item shouldUpdate={(prev, cur) => prev.mode !== cur.mode} noStyle>
           {({ getFieldValue }) =>
             getFieldValue("mode") === "formula" ? (

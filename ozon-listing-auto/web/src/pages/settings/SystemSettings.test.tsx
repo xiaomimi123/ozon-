@@ -29,3 +29,8 @@ test("保存时把 dry-run 布尔转回字符串", async () => {
   const saved = mocks.putSystem.mock.calls[0]?.[0];
   expect(saved?.ozon_publish_dry_run).toBe("true");
 });
+
+test("类目数据来源中文标签", async () => {
+  render(<SystemSettings />);
+  expect(await screen.findByText("类目数据来源")).toBeInTheDocument();
+});
