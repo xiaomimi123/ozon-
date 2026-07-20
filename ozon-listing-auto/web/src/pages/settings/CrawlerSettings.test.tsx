@@ -16,6 +16,12 @@ test("渲染爬虫配置页", async () => {
   await waitFor(() => expect(mocks.getCrawler).toHaveBeenCalled());
 });
 
+test("常用字段可见+高级折叠存在", async () => {
+  render(<CrawlerSettings />);
+  expect(await screen.findByText("Cookie")).toBeInTheDocument();
+  expect(screen.getByText("高级设置（一般无需修改）")).toBeInTheDocument();
+});
+
 test("点击保存触发 putCrawler", async () => {
   render(<CrawlerSettings />);
   await waitFor(() => expect(mocks.getCrawler).toHaveBeenCalled());
