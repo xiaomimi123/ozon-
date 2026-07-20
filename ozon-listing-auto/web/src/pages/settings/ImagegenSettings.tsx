@@ -13,8 +13,8 @@ export default function ImagegenSettings() {
   useEffect(() => {
     getImagegen().then((d) => form.setFieldsValue({ ...DEFAULTS, ...d, img_api_key: "" })).catch(() => {});
   }, []);
-  const onFinish = async (values: any) => {
-    try { await putImagegen(values); message.success("AI 生图配置已保存"); }
+  const onFinish = async () => {
+    try { await putImagegen(form.getFieldsValue(true)); message.success("AI 生图配置已保存"); }
     catch { message.error("保存失败"); }
   };
   const isReal = (p: string) => p === "openai_compat" || p === "http";

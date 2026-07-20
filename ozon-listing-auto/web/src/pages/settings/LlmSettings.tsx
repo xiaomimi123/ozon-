@@ -10,8 +10,8 @@ export default function LlmSettings() {
   useEffect(() => {
     getLlm().then((d) => form.setFieldsValue({ ...DEFAULTS, ...d, llm_api_key: "" })).catch(() => {});
   }, []);
-  const onFinish = async (values: any) => {
-    try { await putLlm(values); message.success("LLM 配置已保存"); }
+  const onFinish = async () => {
+    try { await putLlm(form.getFieldsValue(true)); message.success("LLM 配置已保存"); }
     catch { message.error("保存失败"); }
   };
   return (

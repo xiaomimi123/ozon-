@@ -49,3 +49,20 @@ test("点击保存触发 putImagegen", async () => {
   fireEvent.click(screen.getByRole("button", { name: /保\s*存/ }));
   await waitFor(() => expect(mocks.putImagegen).toHaveBeenCalled());
 });
+
+test("provider=mock 时保存不应丢失已存的 img_model（未挂载字段需随 store 一起提交）", async () => {
+  mocks.getImagegen.mockResolvedValueOnce({
+    provider: "mock",
+    img_base_url: "",
+    img_api_key: "***",
+    img_model: "gpt-image-1",
+    fallback: "",
+    img_request_template: "",
+    img_response_path: "",
+  });
+  render(<ImagegenSettings />);
+  await waitFor(() => expect(mocks.getImagegen).toHaveBeenCalled());
+  fireEvent.click(screen.getByRole("button", { name: /保\s*存/ }));
+  await waitFor(() => expect(mocks.putImagegen).toHaveBeenCalled());
+  expect(mocks.putImagegen).toHaveBeenCalledWith(expect.objectContaining({ img_model: "gpt-image-1" }));
+});

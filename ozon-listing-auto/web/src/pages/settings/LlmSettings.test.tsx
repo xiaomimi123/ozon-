@@ -29,3 +29,12 @@ test("点击保存触发 putLlm", async () => {
   fireEvent.click(screen.getByRole("button", { name: /保\s*存/ }));
   await waitFor(() => expect(mocks.putLlm).toHaveBeenCalled());
 });
+
+test("provider=mock 时保存不应丢失已存的 llm_model（未挂载字段需随 store 一起提交）", async () => {
+  mocks.getLlm.mockResolvedValueOnce({ llm_provider: "mock", llm_base_url: "", llm_api_key: "***", llm_model: "qwen-plus" });
+  render(<LlmSettings />);
+  await waitFor(() => expect(mocks.getLlm).toHaveBeenCalled());
+  fireEvent.click(screen.getByRole("button", { name: /保\s*存/ }));
+  await waitFor(() => expect(mocks.putLlm).toHaveBeenCalled());
+  expect(mocks.putLlm).toHaveBeenCalledWith(expect.objectContaining({ llm_model: "qwen-plus" }));
+});
