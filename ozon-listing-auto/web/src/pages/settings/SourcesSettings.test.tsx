@@ -23,15 +23,21 @@ test("渲染货源配置页", async () => {
   await waitFor(() => expect(mocks.getSources).toHaveBeenCalled());
 });
 
-test("渲染关键字段(图搜端点/请求方法/额外参数/响应路径)", async () => {
+test("端点可见+高级折叠存在", async () => {
+  render(<SourcesSettings />);
+  expect(await screen.findByText("1688 图搜接口地址")).toBeInTheDocument();
+  expect(screen.getByText("高级设置（一般无需修改）")).toBeInTheDocument();
+});
+
+test("渲染关键字段(图搜地址/关键词地址/请求方法/额外参数/响应路径)", async () => {
   render(<SourcesSettings />);
   await waitFor(() => expect(mocks.getSources).toHaveBeenCalled());
-  expect(screen.getByText("图搜端点(image_search_url)")).toBeInTheDocument();
-  expect(screen.getByText("关键词搜索端点(keyword_search_url)")).toBeInTheDocument();
+  expect(screen.getByText("1688 图搜接口地址")).toBeInTheDocument();
+  expect(screen.getByText("1688 关键词搜索接口地址")).toBeInTheDocument();
   expect(screen.getByText("请求方法")).toBeInTheDocument();
-  expect(screen.getByText("额外请求参数(JSON)")).toBeInTheDocument();
-  expect(screen.getByText("额外请求头(JSON)")).toBeInTheDocument();
-  expect(screen.getByText("响应 offerList 点路径")).toBeInTheDocument();
+  expect(screen.getByText("额外请求参数（JSON）")).toBeInTheDocument();
+  expect(screen.getByText("额外请求头（JSON）")).toBeInTheDocument();
+  expect(screen.getByText("响应商品列表路径")).toBeInTheDocument();
 });
 
 test("点击保存触发 putSources", async () => {

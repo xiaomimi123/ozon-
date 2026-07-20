@@ -56,13 +56,12 @@ export default function SystemSettings() {
         >
           <Switch />
         </Form.Item>
-        <Form.Item name="category_tree_provider" label="Category Tree Provider" rules={[{ required: true }]} extra="real 需在爬虫配置填 cookie/proxy">
-          <Select
-            options={[
-              { value: "mock", label: "mock" },
-              { value: "real", label: "real" },
-            ]}
-          />
+        <Form.Item name="category_tree_provider" label="类目数据来源" rules={[{ required: true }]}
+          extra="真实需在爬虫配置填 Cookie/代理">
+          <Select options={[
+            { value: "mock", label: "模拟" },
+            { value: "real", label: "真实（抓取 Ozon 真实类目）" },
+          ]} />
         </Form.Item>
         <Form.Item>
           <Button type="primary" htmlType="submit">保存</Button>
