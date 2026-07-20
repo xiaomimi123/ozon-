@@ -8,14 +8,19 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../../api/llm", () => mocks);
 import LlmSettings from "./LlmSettings";
 
-test("渲染 LLM 配置页", async () => {
+test("显示白话标签与高级折叠，模拟时不显密钥", async () => {
   render(<LlmSettings />);
-  expect(screen.getByText("LLM 配置")).toBeInTheDocument();
-  expect(screen.getByLabelText("Provider")).toBeInTheDocument();
-  expect(screen.getByLabelText("Base URL")).toBeInTheDocument();
-  expect(screen.getByLabelText("Api Key")).toBeInTheDocument();
-  expect(screen.getByLabelText("模型")).toBeInTheDocument();
+  expect(await screen.findByText("大模型来源")).toBeInTheDocument();
+  expect(screen.getByText("高级设置（一般无需修改）")).toBeInTheDocument();
+  expect(screen.queryByText("密钥")).toBeNull();
   await waitFor(() => expect(mocks.getLlm).toHaveBeenCalled());
+});
+
+test("选择「真实」来源时显示密钥与模型名称字段", async () => {
+  mocks.getLlm.mockResolvedValueOnce({ llm_provider: "openai", llm_base_url: "", llm_api_key: "***", llm_model: "gpt-4o-mini" });
+  render(<LlmSettings />);
+  expect(await screen.findByText("密钥")).toBeInTheDocument();
+  expect(screen.getByText("模型名称")).toBeInTheDocument();
 });
 
 test("点击保存触发 putLlm", async () => {
