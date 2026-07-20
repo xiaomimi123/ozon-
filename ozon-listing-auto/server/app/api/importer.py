@@ -1,14 +1,19 @@
 """采集导入 API：扩展回传搜索响应 → 存原始 + 路径可配解析入库。ingest 用 X-Import-Token 鉴权。"""
 import io
 from fastapi import APIRouter, Depends, Header, HTTPException, UploadFile, File, status
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.config import settings
 from app.core.db import get_session
 from app.api.deps import require_role
-from app.models import User, ImportCapture, ImportedProduct
+from app.models import User, ImportCapture, ImportedProduct, OzonProduct
 from app.services.sources.conf import get_source_conf
 from app.services.sources.parser_import import parse_1688_search, DEFAULT_IMPORT_PATHS
 from app.services.sources.parser_excel import parse_1688_excel, DEFAULT_EXCEL_COLS
+from app.services.sources.parser_ali import parse_offers
+from app.services.candidate_ingest import dedup_and_upsert
+from app.services.embedding.factory import get_embedder
 
 router = APIRouter(prefix="/import", tags=["import"])
 
@@ -43,6 +48,30 @@ async def ingest(payload: dict, keyword: str | None = None,
         parsed += 1
     await s.commit()
     return {"capture_id": cap.id, "captured": len(rows), "parsed": parsed}
+
+class ImageSearchIn(BaseModel):
+    task_id: int
+    ozon_product_id: int
+    payload: dict
+
+@router.post("/image-search")
+async def ingest_image_search(body: ImageSearchIn, x_import_token: str | None = Header(default=None),
+                              s: AsyncSession = Depends(get_session)):
+    conf = await get_source_conf(s)
+    token = conf.get("import_token") or ""
+    if not token or x_import_token != token:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "无效导入令牌")
+    prod = (await s.execute(select(OzonProduct).where(
+        OzonProduct.id == body.ozon_product_id, OzonProduct.task_id == body.task_id))).scalar_one_or_none()
+    if not prod:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "商品不存在或不属于该任务")
+    dtos = parse_offers(body.payload, conf.get("ali1688_offer_list_path", "data.offerList"))
+    s.add(ImportCapture(platform="ali1688", keyword=f"图搜:product={body.ozon_product_id}",
+                        raw=body.payload, item_count=len(dtos)))
+    embedder = get_embedder(settings.embedder)
+    result = await dedup_and_upsert(s, body.task_id, body.ozon_product_id, dtos, embedder)
+    await s.commit()
+    return {**result, "captured": len(dtos)}
 
 @router.post("/excel")
 async def ingest_excel(file: UploadFile = File(...), s: AsyncSession = Depends(get_session), _: User = Depends(require_role("admin"))):
