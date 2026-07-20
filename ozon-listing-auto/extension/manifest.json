@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "Ozon 货源采集器 (1688 PoC)",
+  "version": "0.1.0",
+  "permissions": ["storage"],
+  "host_permissions": ["*://*.1688.com/*", "<all_urls>"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [{ "matches": ["*://*.1688.com/*"], "js": ["content.js"], "run_at": "document_start" }],
+  "web_accessible_resources": [{ "resources": ["interceptor.js"], "matches": ["*://*.1688.com/*"] }],
+  "options_page": "options.html"
+}

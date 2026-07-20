@@ -9,6 +9,7 @@ import Shops from "./pages/Shops";
 import PricingSettings from "./pages/PricingSettings";
 import PublishMonitor from "./pages/PublishMonitor";
 import ImageStudio from "./pages/ImageStudio";
+import ImportedProducts from "./pages/ImportedProducts";
 import ImagegenSettings from "./pages/settings/ImagegenSettings";
 import CrawlerSettings from "./pages/settings/CrawlerSettings";
 import SystemSettings from "./pages/settings/SystemSettings";
@@ -31,6 +32,7 @@ export default function App() {
           <Route path="/pricing" element={<PricingSettings />} />
           <Route path="/monitor" element={<PublishMonitor />} />
           <Route path="/image-studio" element={<ImageStudio />} />
+          <Route path="/imported" element={<ImportedProducts />} />
           <Route path="/settings/imagegen" element={<ImagegenSettings />} />
           <Route path="/settings/crawler" element={<CrawlerSettings />} />
           <Route path="/settings/system" element={<SystemSettings />} />

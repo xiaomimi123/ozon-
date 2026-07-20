@@ -22,6 +22,37 @@ async def test_sources_settings_roundtrip(client, db_session):
 
 
 @pytest.mark.asyncio
+async def test_sources_import_token_mask_and_paths(client, db_session):
+    h = await _admin(client, db_session)
+    await client.put("/settings/sources", headers=h, json={
+        "import_token": "tok-secret", "import_1688_list_path": "data.items"})
+    g = (await client.get("/settings/sources", headers=h)).json()
+    assert g["import_token"] == "***" and "tok-secret" not in str(g)
+    assert g["import_1688_list_path"] == "data.items"
+
+    # 留空不覆盖 import_token；其它路径字段正常整表覆盖
+    await client.put("/settings/sources", headers=h, json={
+        "import_token": "", "import_1688_list_path": "data.items2"})
+    g2 = (await client.get("/settings/sources", headers=h)).json()
+    assert g2["import_token"] == "***"          # 仍脱敏 → 底层值还在
+    assert g2["import_1688_list_path"] == "data.items2"
+    from app.services.settings_store import get_value
+    assert await get_value(db_session, "sources", "import_token") == "tok-secret"  # 未被清空覆盖
+
+
+@pytest.mark.asyncio
+async def test_sources_ali1688_fields_unaffected_by_import_token(client, db_session):
+    h = await _admin(client, db_session)
+    await client.put("/settings/sources", headers=h, json={
+        "ali1688_image_search_url": "https://h5.1688.com/img", "ali1688_method": "POST",
+        "ali1688_extra_params": '{"sign":"X"}', "ali1688_offer_list_path": "result.items"})
+    g = (await client.get("/settings/sources", headers=h)).json()
+    assert g["ali1688_image_search_url"] == "https://h5.1688.com/img" and g["ali1688_method"] == "POST"
+    assert g["ali1688_offer_list_path"] == "result.items"
+    assert g["import_token"] == ""   # 未设置时明文空
+
+
+@pytest.mark.asyncio
 async def test_get_source_conf_parses_json(db_session):
     from app.services.sources.conf import get_source_conf, DEFAULT_SOURCE_CONF
     from app.services.settings_store import set_value
