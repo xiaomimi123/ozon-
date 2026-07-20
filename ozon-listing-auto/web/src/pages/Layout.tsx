@@ -11,6 +11,7 @@ const menuItems: { key: string; label: string; adminOnly?: boolean }[] = [
   { key: "listing", label: "上架审核" },
   { key: "image-studio", label: "图片工作室" },
   { key: "monitor", label: "上架监控" },
+  { key: "imported", label: "导入商品", adminOnly: true },
   { key: "shops", label: "店铺管理", adminOnly: true },
   { key: "pricing", label: "定价设置", adminOnly: true },
   { key: "settings/imagegen", label: "AI 生图配置", adminOnly: true },
