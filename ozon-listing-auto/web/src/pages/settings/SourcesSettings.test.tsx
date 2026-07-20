@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
       ali1688_extra_params: "",
       ali1688_extra_headers: "",
       ali1688_offer_list_path: "data.offerList",
+      import_token: "",
     })
   ),
   putSources: vi.fn(() => Promise.resolve({})),
@@ -45,4 +46,17 @@ test("点击保存触发 putSources", async () => {
   await waitFor(() => expect(mocks.getSources).toHaveBeenCalled());
   fireEvent.click(screen.getByRole("button", { name: /保\s*存/ }));
   await waitFor(() => expect(mocks.putSources).toHaveBeenCalled());
+});
+
+test("显示采集令牌字段与高级折叠内的解析路径字段", async () => {
+  mocks.getSources.mockResolvedValueOnce({
+    ali1688_image_search_url: "", ali1688_keyword_search_url: "", ali1688_method: "GET",
+    ali1688_extra_params: "", ali1688_extra_headers: "", ali1688_offer_list_path: "data.offerList",
+    import_token: "***",
+  });
+  render(<SourcesSettings />);
+  expect(await screen.findByText("采集令牌")).toBeInTheDocument();
+  expect(screen.getByText("商品列表路径")).toBeInTheDocument();
+  expect(screen.getByText("标题路径")).toBeInTheDocument();
+  expect(screen.getByText("价格路径")).toBeInTheDocument();
 });
