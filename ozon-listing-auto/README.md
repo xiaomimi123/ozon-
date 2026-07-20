@@ -160,7 +160,7 @@ ozon-listing-auto/
 
 ## M2 已实现功能（货源匹配）
 
-- **账号池**（`/accounts`，admin）：1688/拼多多货源账号 CRUD，cookie/会话等凭据用 `FERNET_KEY` 加密存储、响应脱敏（不回传凭据明文）；调用时按日限额 `daily_limit`、最小请求间隔 `min_interval_sec` 限速取号，触发风控自动冷却换号，不中断主流程
+- **账号池**（`/accounts`，admin；前端「货源账号」页 `/source-accounts`）：1688/拼多多货源账号可视化增删改查——新增/启停/更新 Cookie/冷却手动恢复/删除，cookie/会话等凭据用 `FERNET_KEY` 加密存储、响应脱敏（不回传凭据明文）；调用时按日限额 `daily_limit`、最小请求间隔 `min_interval_sec` 限速取号，触发风控自动冷却换号，不中断主流程
 - **双源货源匹配**：
   - **1688**：`httpx` + cookie 会话真实图搜/关键词搜索 + 解析器（供货商信用等级/复购率等 `supplier_info`）
   - **拼多多**：一期先落地 JSON 解析层 `parse_pdd_items`（分→元换算、字段映射，已测试），真实图搜/关键词搜索需 `selenium` + 代理截获移动端 API，一期在 `PinduoduoProvider` 中为占位（抛 `NotImplementedError`），留待后续接入
@@ -411,7 +411,7 @@ OZON_CLIENT_ID=.. OZON_API_KEY=.. OZON_TARGET_SKU=.. \
   - `ali1688_method`：`GET` 或 `POST`。
   - `ali1688_extra_params` / `ali1688_extra_headers`：JSON 对象字符串，装签名等额外请求参数/请求头（如 `{"sign": "..."}`）。
   - `ali1688_offer_list_path`：响应 JSON 中候选列表的点路径，默认 `data.offerList`；`parse_offers`（`app/services/sources/parser_ali.py`）按该路径容错解析，取不到或字段缺失的条目会被跳过而非报错。
-- **登录态 cookie 不在这个页面填**：仍在「货源账号池」（`source_accounts`，M2 已建）按账号配置，`Ali1688Provider` 请求时从传入的 `session` 里取 cookie 注入。
+- **登录态 cookie 不在这个页面填**：在前端「货源账号」页（`/source-accounts`）按账号可视化配置，`Ali1688Provider` 请求时从传入的 `session` 里取 cookie 注入。
 - **诚实边界（务必读完）**：1688 拍立淘图搜是**淘宝系 mtop 签名 API**，请求需要动态签名（`sign`/`t`/`appKey` 等），签名算法本轮**未逆向复现**——过于脆弱、易随 1688 前端版本失效，也涉及 ToS 风险。真实可用的做法：
   1. 你在浏览器里对 1688 App/网页版拍立淘发起一次真实搜索，用 devtools 抓包拿到当次的真实请求 URL/方法/参数(含 sign)/响应结构；
   2. 把端点、方法、额外参数（含抓到的签名，注意签名通常有时效，需定期重抓或做成动态获取）、响应取值路径填进 `/settings/sources`；cookie 填进货源账号池；

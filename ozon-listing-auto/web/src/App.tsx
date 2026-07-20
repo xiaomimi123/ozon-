@@ -15,6 +15,7 @@ import SystemSettings from "./pages/settings/SystemSettings";
 import LlmSettings from "./pages/settings/LlmSettings";
 import SourcesSettings from "./pages/settings/SourcesSettings";
 import StaffSettings from "./pages/settings/StaffSettings";
+import SourceAccounts from "./pages/settings/SourceAccounts";
 
 export default function App() {
   return (
@@ -36,6 +37,7 @@ export default function App() {
           <Route path="/settings/llm" element={<LlmSettings />} />
           <Route path="/settings/sources" element={<SourcesSettings />} />
           <Route path="/staff" element={<StaffSettings />} />
+          <Route path="/source-accounts" element={<SourceAccounts />} />
         </Route>
         <Route path="*" element={<Navigate to="/tasks" replace />} />
       </Routes>

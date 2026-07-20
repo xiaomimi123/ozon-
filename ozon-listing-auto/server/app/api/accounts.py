@@ -37,6 +37,8 @@ async def update_account(account_id: int, body: AccountUpdate, s: AsyncSession =
         v = getattr(body, f)
         if v is not None:
             setattr(acc, f, v)
+    if body.status == "active":
+        acc.cooldown_until = None   # 手动恢复：清冷却, acquire 方可立即选中
     if body.credentials is not None:
         acc.credentials_encrypted = encrypt(json.dumps(body.credentials))
     await s.commit(); await s.refresh(acc)
