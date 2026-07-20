@@ -31,6 +31,7 @@ from app.api.publish import router as publish_router
 from app.api.images import router as images_router
 from app.api.category import router as category_router
 from app.api.ozon_catalog import router as ozon_catalog_router
+from app.api.importer import router as import_router
 
 setup_logging()
 
@@ -83,6 +84,7 @@ app.include_router(publish_router)
 app.include_router(images_router)
 app.include_router(category_router)
 app.include_router(ozon_catalog_router)
+app.include_router(import_router)
 
 # 改图产物静态目录：static/images 下的处理产物经 /static 对外暴露。
 os.makedirs("static/images", exist_ok=True)
