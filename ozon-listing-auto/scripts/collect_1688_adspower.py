@@ -4,6 +4,7 @@
 用法: python scripts/collect_1688_adspower.py --user-id <adspower环境ID> --keyword 连衣裙 --pages 2
 """
 import argparse, time, urllib.request, json
+from urllib.parse import quote
 
 def _get(url):
     with urllib.request.urlopen(url, timeout=30) as r:
@@ -24,7 +25,7 @@ def main():
         browser = p.chromium.connect_over_cdp(ws)
         page = browser.contexts[0].pages[0] if browser.contexts[0].pages else browser.contexts[0].new_page()
         for pg in range(1, a.pages + 1):
-            url = f"https://s.1688.com/selloffer/offer_search.htm?keywords={a.keyword}&beginPage={pg}"
+            url = f"https://s.1688.com/selloffer/offer_search.htm?keywords={quote(a.keyword)}&beginPage={pg}"
             page.goto(url, wait_until="domcontentloaded")
             time.sleep(a.dwell)  # 等扩展拦截并回传; 遇滑块请人工处理
         browser.close()
