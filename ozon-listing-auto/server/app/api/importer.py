@@ -1,5 +1,6 @@
 """采集导入 API：扩展回传搜索响应 → 存原始 + 路径可配解析入库。ingest 用 X-Import-Token 鉴权。"""
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+import io
+from fastapi import APIRouter, Depends, Header, HTTPException, UploadFile, File, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import get_session
@@ -7,6 +8,7 @@ from app.api.deps import require_role
 from app.models import User, ImportCapture, ImportedProduct
 from app.services.sources.conf import get_source_conf
 from app.services.sources.parser_import import parse_1688_search, DEFAULT_IMPORT_PATHS
+from app.services.sources.parser_excel import parse_1688_excel, DEFAULT_EXCEL_COLS
 
 router = APIRouter(prefix="/import", tags=["import"])
 
@@ -41,6 +43,37 @@ async def ingest(payload: dict, keyword: str | None = None,
         parsed += 1
     await s.commit()
     return {"capture_id": cap.id, "captured": len(rows), "parsed": parsed}
+
+@router.post("/excel")
+async def ingest_excel(file: UploadFile = File(...), s: AsyncSession = Depends(get_session), _: User = Depends(require_role("admin"))):
+    if not (file.filename or "").lower().endswith(".xlsx"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "仅支持 .xlsx 文件")
+    data = await file.read()
+    try:
+        import openpyxl
+        wb = openpyxl.load_workbook(io.BytesIO(data), read_only=True, data_only=True)
+        ws = wb.active
+        rows = [list(r) for r in ws.iter_rows(values_only=True)]
+        wb.close()
+    except Exception:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "无法解析 Excel 文件")
+    parsed_rows = parse_1688_excel(rows, DEFAULT_EXCEL_COLS)
+    headers = [str(h) for h in (rows[0] if rows else []) if h is not None]
+    cap = ImportCapture(platform="ali1688", keyword=file.filename,
+                        raw={"headers": headers, "row_count": max(0, len(rows) - 1)}, item_count=len(parsed_rows))
+    s.add(cap); await s.flush()
+    parsed = 0
+    for r in parsed_rows:
+        exists = (await s.execute(select(ImportedProduct).where(
+            ImportedProduct.platform == "ali1688", ImportedProduct.offer_id == r["offer_id"]))).scalar_one_or_none()
+        if exists:
+            continue
+        s.add(ImportedProduct(platform="ali1688", offer_id=r["offer_id"], title=r["title"], price=r["price"],
+                              image_url=r["image_url"], shop_name=r["shop_name"], detail_url=r["detail_url"],
+                              sales=r["sales"], raw=r["raw"], capture_id=cap.id))
+        parsed += 1
+    await s.commit()
+    return {"capture_id": cap.id, "captured": len(parsed_rows), "parsed": parsed, "skipped": len(parsed_rows) - parsed}
 
 @router.get("/offers")
 async def list_offers(platform: str | None = None, limit: int = 200,
